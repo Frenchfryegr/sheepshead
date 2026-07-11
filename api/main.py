@@ -15,9 +15,5 @@ supabase: Client = create_client(
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"Bruh": "You made a request to the base endpoint. You prolly don't know what you're doing huh?"}
 
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str | None = None):
-    return {"item_id": item_id, "q": q}

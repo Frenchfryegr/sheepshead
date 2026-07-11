@@ -1,0 +1,15 @@
+info:
+  name: Base Endpoint
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{api_url}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
