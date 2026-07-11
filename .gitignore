@@ -1,2 +1,6 @@
+#vscode garbage
 angular/.vscode
 /.vscode
+
+# environment files
+.env
