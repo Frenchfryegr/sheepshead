@@ -50,4 +50,8 @@ export class GamesService {
   completeGame(gameId: number): Observable<Game> {
     return this.http.patch<Game>(`${environment.apiUrl}/${environment.games}/${gameId}/complete`, null)
   }
+
+  deleteGame(gameId: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiUrl}/${environment.games}/${gameId}`)
+  }
 }
