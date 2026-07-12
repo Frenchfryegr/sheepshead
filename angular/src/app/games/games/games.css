@@ -147,6 +147,13 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
+.btn-primary:disabled {
+  background: #d1d5db;
+  color: #6b7280;
+  box-shadow: none;
+  opacity: 1;
+}
+
 .btn-secondary {
   background: #f3f4f6;
   color: #374151;
