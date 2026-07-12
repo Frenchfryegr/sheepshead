@@ -166,6 +166,28 @@
   font-size: 0.8rem;
 }
 
+.dialog-danger-zone {
+  display: flex;
+  justify-content: center;
+  padding: 4px 24px 16px;
+}
+
+.btn-link-danger {
+  background: none;
+  border: none;
+  color: #b91c1c;
+  font-size: 0.75rem;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: opacity 0.15s ease;
+}
+
+.btn-link-danger:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
 .btn-close {
   background: none;
   border: none;

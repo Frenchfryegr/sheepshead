@@ -85,6 +85,19 @@ def create_game(num_players: int = Body(...), player_ids: list[int] = Body(...))
 
 @app.delete("/games/{game_id}", tags=["Game Management"])
 def delete_game(game_id):
+    rounds_response = (
+        supabase.table(TABLE_NAMES.ROUNDS.value)
+        .select("round_id")
+        .eq("game_id", game_id)
+        .execute()
+    )
+
+    for round_row in rounds_response.data:
+        supabase.table(TABLE_NAMES.PLAYERROUNDSCORE.value).delete().eq("round_id", round_row["round_id"]).execute()
+
+    supabase.table(TABLE_NAMES.ROUNDS.value).delete().eq("game_id", game_id).execute()
+    supabase.table(TABLE_NAMES.PLAYERSXGAMES.value).delete().eq("game_id", game_id).execute()
+
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
         .delete()

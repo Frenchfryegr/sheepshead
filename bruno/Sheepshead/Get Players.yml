@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: ""
+  url: "{{api_url}}/players"
   auth: inherit
 
 settings:

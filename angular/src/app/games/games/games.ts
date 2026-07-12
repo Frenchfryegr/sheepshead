@@ -132,6 +132,15 @@ export class Games {
     return winnerNames.length > 0 ? winnerNames.join(', ') : '—'
   }
 
+  deleteCurrentGame() {
+    const gameId = this.newGameId()
+    if (!gameId) return
+    if (!confirm('Delete this game? This will permanently remove all of its rounds and scores.')) return
+    this.gamesService.deleteGame(gameId).subscribe(() => {
+      this.closeWizard()
+    })
+  }
+
   selectGame(game: Game) {
     this.selectedGame = game
     if (game.is_completed) {
