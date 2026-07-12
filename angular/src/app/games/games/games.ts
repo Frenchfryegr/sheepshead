@@ -74,10 +74,8 @@ export class Games {
   editingRoundId = signal<number | null>(null)
 
   isLeasterRound = computed(() => this.roundResult() === 'Leaster')
-  showPartnerSelect = computed(() =>
-    this.newGamePlayers().length === 5 && !this.isLeasterRound() && !this.roundNoPartner()
-  )
-  showNoPartnerCheckbox = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
+  showPartnerSelect = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
+  partnerSelectValue = computed(() => this.roundNoPartner() ? -1 : this.roundPartnerPlayerId())
 
   roundPlayerScores = computed(() => this.calculatePlayerScores())
   activeScoreTable = computed(() => this.buildScoreTable(this.newGamePlayers(), this.roundHistory()))
@@ -424,9 +422,20 @@ export class Games {
     this.step.set('idle')
   }
 
-  toggleNoPartner(value: boolean) {
-    this.roundNoPartner.set(value)
-    if (value) this.roundPartnerPlayerId.set(null)
+  onPickerChange(playerId: number | null) {
+    this.roundPickerPlayerId.set(playerId)
+    this.roundPartnerPlayerId.set(null)
+    this.roundNoPartner.set(false)
+  }
+
+  onPartnerChange(value: number | null) {
+    if (value === -1) {
+      this.roundNoPartner.set(true)
+      this.roundPartnerPlayerId.set(null)
+    } else {
+      this.roundNoPartner.set(false)
+      this.roundPartnerPlayerId.set(value)
+    }
   }
 
   toggleNoSchneider(value: boolean) {

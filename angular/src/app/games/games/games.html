@@ -242,7 +242,7 @@
 
       <div class="form-group">
         <label>{{ isLeasterRound() ? 'Leaster Winner' : 'Picker' }}</label>
-        <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="roundPartnerPlayerId.set(null); roundPickerPlayerId.set($event)">
+        <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
           <option [ngValue]="null" disabled>Select player</option>
           @for (player of newGamePlayers(); track player.player_id) {
             <option [ngValue]="player.player_id">{{ player.player_name }}</option>
@@ -253,8 +253,9 @@
       @if (showPartnerSelect()) {
         <div class="form-group">
           <label>Partner</label>
-          <select class="input" [ngModel]="roundPartnerPlayerId()" (ngModelChange)="roundPartnerPlayerId.set($event)">
+          <select class="input" [ngModel]="partnerSelectValue()" (ngModelChange)="onPartnerChange($event)">
             <option [ngValue]="null" disabled>Select partner</option>
+            <option [ngValue]="-1">No Partner</option>
             @for (player of newGamePlayers(); track player.player_id) {
               @if (player.player_id !== roundPickerPlayerId()) {
                 <option [ngValue]="player.player_id">{{ player.player_name }}</option>
@@ -276,12 +277,6 @@
               <label class="checkbox-label checkbox-label--nested">
                 <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
                 No Trick (x3)
-              </label>
-            }
-            @if (showNoPartnerCheckbox()) {
-              <label class="checkbox-label">
-                <input type="checkbox" [ngModel]="roundNoPartner()" (ngModelChange)="toggleNoPartner($event)" />
-                No Partner
               </label>
             }
           </div>
