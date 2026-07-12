@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,7 +72,7 @@ def get_games():
 def create_game(num_players: int = Body(...), player_ids: list[int] = Body(...)):
     game_response = (
         supabase.table(TABLE_NAMES.GAMES.value)
-        .insert({"num_players": num_players, "game_datetime": datetime.now().isoformat()})
+        .insert({"num_players": num_players, "game_datetime": datetime.now(timezone.utc).isoformat()})
         .execute()
     )
     game = game_response.data[0]

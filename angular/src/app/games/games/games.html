@@ -64,7 +64,7 @@
                   <span class="badge badge-in-progress">In Progress</span>
                 }
               </td>
-              <td data-label="Winner">{{ getGameWinnerName(game) }}</td>
+              <td [attr.data-label]="game.is_completed ? 'Winner' : 'Winning'">{{ getGameWinnerName(game) }}</td>
             </tr>
           }
         </tbody>
@@ -183,17 +183,24 @@
       </div>
 
       <div class="form-group">
-        <label>Add new player</label>
         <div class="input-row">
-          <input
-            class="input"
-            type="text"
-            placeholder="Enter player name"
-            [ngModel]="newPlayerName()"
-            (ngModelChange)="newPlayerName.set($event)"
-            (keyup.enter)="addNewPlayer()"
-          />
-          <button class="btn btn-secondary btn-add-player" (click)="addNewPlayer()" [disabled]="!newPlayerName().trim()">+ Add Player</button>
+          @if (addPlayerFormOpen()) {
+            <input
+              class="input"
+              type="text"
+              placeholder="Enter player name"
+              [ngModel]="newPlayerName()"
+              (ngModelChange)="newPlayerName.set($event)"
+              (keyup.enter)="addNewPlayer()"
+            />
+          }
+          <button class="btn btn-secondary btn-add-player" (click)="handleAddPlayerClick()" [disabled]="addPlayerFormOpen() && !newPlayerName().trim()">
+            @if (addPlayerFormOpen()) {
+              ✓ Add Player
+            } @else {
+              + New Player
+            }
+          </button>
         </div>
       </div>
 
@@ -213,7 +220,7 @@
     </div>
     <div class="dialog-footer">
       <button class="btn btn-secondary" (click)="gameWizardDialog.nativeElement.close(); step.set('idle')">Cancel</button>
-      <button class="btn btn-primary" (click)="submitGame()" [disabled]="newGamePlayers().length < 2">Start Game</button>
+      <button class="btn btn-primary" (click)="submitGame()" [disabled]="newGamePlayers().length !== 3 && newGamePlayers().length !== 5">Start Game</button>
     </div>
   }
 
@@ -235,7 +242,7 @@
 
       <div class="form-group">
         <label>{{ isLeasterRound() ? 'Leaster Winner' : 'Picker' }}</label>
-        <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="roundPartnerPlayerId.set(null); roundPickerPlayerId.set($event)">
+        <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
           <option [ngValue]="null" disabled>Select player</option>
           @for (player of newGamePlayers(); track player.player_id) {
             <option [ngValue]="player.player_id">{{ player.player_name }}</option>
@@ -246,8 +253,9 @@
       @if (showPartnerSelect()) {
         <div class="form-group">
           <label>Partner</label>
-          <select class="input" [ngModel]="roundPartnerPlayerId()" (ngModelChange)="roundPartnerPlayerId.set($event)">
+          <select class="input" [ngModel]="partnerSelectValue()" (ngModelChange)="onPartnerChange($event)">
             <option [ngValue]="null" disabled>Select partner</option>
+            <option [ngValue]="-1">No Partner</option>
             @for (player of newGamePlayers(); track player.player_id) {
               @if (player.player_id !== roundPickerPlayerId()) {
                 <option [ngValue]="player.player_id">{{ player.player_name }}</option>
@@ -259,22 +267,15 @@
 
       @if (!isLeasterRound()) {
         <div class="form-group">
-          <label>Modifiers</label>
           <div class="checkbox-group">
             <label class="checkbox-label">
               <input type="checkbox" [ngModel]="roundNoSchneider()" (ngModelChange)="toggleNoSchneider($event)" />
-              No Schneider (x2)
+              No Schneider
             </label>
             @if (roundNoSchneider()) {
               <label class="checkbox-label checkbox-label--nested">
                 <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
-                No Trick (x3)
-              </label>
-            }
-            @if (showNoPartnerCheckbox()) {
-              <label class="checkbox-label">
-                <input type="checkbox" [ngModel]="roundNoPartner()" (ngModelChange)="toggleNoPartner($event)" />
-                No Partner
+                No Trick
               </label>
             }
           </div>
