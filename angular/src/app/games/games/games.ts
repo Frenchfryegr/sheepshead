@@ -1,7 +1,33 @@
-import { Component, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { GamesService } from '../games-service';
 import { Game } from '../../interfaces/game';
+import { Player } from '../../interfaces/player';
+import { PlayerRoundScore, PlayerRole, Round } from '../../interfaces/round';
+
+interface RoundHistoryEntry {
+  round_id: number
+  round_number: number
+  round_result: string
+  no_schneider: boolean
+  no_partner: boolean
+  no_trick: boolean
+  scores: PlayerRoundScore[]
+}
+
+interface ScoreTableRow {
+  round_number: number
+  totals: Map<number, number>
+}
+
+interface ScoreTable {
+  players: Player[]
+  initials: Map<number, string>
+  rows: ScoreTableRow[]
+}
+
+type GameSortColumn = 'game_datetime' | 'num_players' | 'rounds' | 'status' | 'winner'
+type SortDirection = 'asc' | 'desc'
 
 @Component({
   selector: 'app-games',
@@ -11,20 +37,437 @@ import { Game } from '../../interfaces/game';
 })
 export class Games {
   private gamesService = inject(GamesService)
+  private gamesSignal = signal<Game[]>([])
+  games = this.gamesSignal.asReadonly()
 
-  games = toSignal(this.gamesService.getGames(), { initialValue: [] });  selectedGame: Game | null = null
+  sortColumn = signal<GameSortColumn>('game_datetime')
+  sortDirection = signal<SortDirection>('desc')
+  sortedGames = computed(() => {
+    const column = this.sortColumn()
+    const multiplier = this.sortDirection() === 'asc' ? 1 : -1
+    return [...this.games()].sort((a, b) => multiplier * this.compareGames(a, b, column))
+  })
 
-  addGame() {
+  selectedGame: Game | null = null
 
+  @ViewChild('ShowGameRounds') showGameRoundsDialog!: ElementRef<HTMLDialogElement>
+  @ViewChild('GameWizardDialog') gameWizardDialog!: ElementRef<HTMLDialogElement>
+
+  step = signal<'idle' | 'players' | 'rounds'>('idle')
+  existingPlayers = signal<Player[]>([])
+  newGamePlayers = signal<Player[]>([])
+  newPlayerName = signal('')
+  newGameId = signal<number | null>(null)
+  currentRoundNumber = signal(1)
+  roundPickerPlayerId = signal<number | null>(null)
+  roundPartnerPlayerId = signal<number | null>(null)
+  roundResult = signal<string>('')
+  roundNoSchneider = signal(false)
+  roundNoPartner = signal(false)
+  roundNoTrick = signal(false)
+  isSubmittingRound = signal(false)
+  roundHistory = signal<RoundHistoryEntry[]>([])
+  editingRoundId = signal<number | null>(null)
+
+  isLeasterRound = computed(() => this.roundResult() === 'Leaster')
+  showPartnerSelect = computed(() =>
+    this.newGamePlayers().length === 5 && !this.isLeasterRound() && !this.roundNoPartner()
+  )
+  showNoPartnerCheckbox = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
+
+  roundPlayerScores = computed(() => this.calculatePlayerScores())
+  activeScoreTable = computed(() => this.buildScoreTable(this.newGamePlayers(), this.roundHistory()))
+
+  constructor() {
+    this.refreshGames()
   }
 
-selectGame(game_id: number) {
-  this.selectedGame = this.games()?.find(game => game.game_id === game_id) ?? null;
-  console.log("selected game " + game_id)
-  console.log(this.selectedGame)
-}
+  refreshGames() {
+    this.gamesService.getGames().subscribe(games => this.gamesSignal.set(games))
+  }
 
-  // getRoundsForGame(game_id: number) {
-  //   this.selectedGame = toSignal(this.gamesService.getRoundsForGame(game_id))
-  // }
+  toggleSort(column: GameSortColumn) {
+    if (this.sortColumn() === column) {
+      this.sortDirection.update(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      this.sortColumn.set(column)
+      this.sortDirection.set('asc')
+    }
+  }
+
+  private compareGames(a: Game, b: Game, column: GameSortColumn): number {
+    switch (column) {
+      case 'game_datetime':
+        return new Date(a.game_datetime).getTime() - new Date(b.game_datetime).getTime()
+      case 'num_players':
+        return a.num_players - b.num_players
+      case 'rounds':
+        return a.Rounds.length - b.Rounds.length
+      case 'status':
+        return Number(a.is_completed) - Number(b.is_completed)
+      case 'winner':
+        return this.getGameWinnerName(a).localeCompare(this.getGameWinnerName(b))
+    }
+  }
+
+  getGameWinnerName(game: Game): string {
+    if (!game.Rounds || game.Rounds.length === 0) return '—'
+
+    const totals = new Map<number, number>()
+    for (const round of game.Rounds) {
+      for (const score of round.PlayerRoundScore) {
+        totals.set(score.player_id, (totals.get(score.player_id) ?? 0) + score.point_delta)
+      }
+    }
+
+    let winnerId: number | null = null
+    let winnerTotal = -Infinity
+    for (const [playerId, total] of totals) {
+      if (total > winnerTotal) {
+        winnerTotal = total
+        winnerId = playerId
+      }
+    }
+    if (winnerId === null) return '—'
+
+    const winner = game.Players_X_Games.find(pxg => pxg.Players.player_id === winnerId)?.Players
+    return winner?.player_name ?? '—'
+  }
+
+  selectGame(game: Game) {
+    this.selectedGame = game
+    if (game.is_completed) {
+      this.showGameRoundsDialog.nativeElement.showModal()
+    } else {
+      this.resumeGame(game)
+    }
+  }
+
+  resumeGame(game: Game) {
+    const players = game.Players_X_Games.map(pxg => pxg.Players)
+
+    this.newGamePlayers.set(players)
+    this.newGameId.set(game.game_id)
+    this.refreshWizardRoundState(game)
+    this.resetRoundForm()
+    this.step.set('rounds')
+    this.gameWizardDialog.nativeElement.showModal()
+  }
+
+  private refreshWizardRoundState(game: Game) {
+    const sortedRounds = [...game.Rounds].sort((a, b) => a.round_number - b.round_number)
+    this.roundHistory.set(sortedRounds.map(r => this.toHistoryEntry(r)))
+    const maxRoundNumber = sortedRounds.reduce((max, r) => Math.max(max, r.round_number), 0)
+    this.currentRoundNumber.set(maxRoundNumber + 1)
+  }
+
+  startNewGame() {
+    this.step.set('players')
+    this.newGamePlayers.set([])
+    this.newPlayerName.set('')
+    this.newGameId.set(null)
+    this.currentRoundNumber.set(1)
+    this.roundHistory.set([])
+    this.resetRoundForm()
+    this.gamesService.getPlayers().subscribe(players => {
+      this.existingPlayers.set(players)
+    })
+    this.gameWizardDialog.nativeElement.showModal()
+  }
+
+  addExistingPlayer(player: Player) {
+    const current = this.newGamePlayers()
+    if (!current.find(p => p.player_id === player.player_id)) {
+      this.newGamePlayers.set([...current, player])
+    }
+  }
+
+  addNewPlayer() {
+    const name = this.newPlayerName().trim()
+    if (!name) return
+    this.gamesService.createPlayer(name).subscribe(player => {
+      const current = this.newGamePlayers()
+      this.newGamePlayers.set([...current, player])
+      this.newPlayerName.set('')
+    })
+  }
+
+  removePlayer(index: number) {
+    const current = this.newGamePlayers()
+    current.splice(index, 1)
+    this.newGamePlayers.set([...current])
+  }
+
+  submitGame() {
+    const players = this.newGamePlayers()
+    if (players.length < 2) return
+    this.gamesService.createGame({
+      num_players: players.length,
+      player_ids: players.map(p => p.player_id)
+    }).subscribe(game => {
+      this.newGameId.set(game.game_id)
+      this.step.set('rounds')
+    })
+  }
+
+  calculatePlayerScores(): PlayerRoundScore[] {
+    const players = this.newGamePlayers()
+    const pickerId = this.roundPickerPlayerId()
+    const partnerId = this.roundPartnerPlayerId()
+    const result = this.roundResult()
+    const isLeaster = result === 'Leaster'
+    const numPlayers = players.length
+    if (!pickerId || !result) return []
+
+    const hasPartner = !isLeaster && !!partnerId
+    const opponentDelta = 1
+    const numOpponents = numPlayers - 1 - (hasPartner ? 1 : 0)
+    const pickerDelta = hasPartner ? 2 : numOpponents * opponentDelta
+    const partnerDelta = hasPartner ? 1 : null
+    const leasterWinnerDelta = numPlayers === 3 ? 2 : 4
+    const leasterLoserDelta = 1
+
+    let multiplier = 1
+    if (!isLeaster) {
+      if (this.roundNoTrick()) multiplier = 3
+      else if (this.roundNoSchneider()) multiplier = 2
+    }
+
+    return players.map(player => {
+      let role: PlayerRole
+      let delta: number
+
+      if (isLeaster) {
+        if (player.player_id === pickerId) {
+          role = 'Leaster Winner'
+          delta = leasterWinnerDelta
+        } else {
+          role = 'Leaster Loser'
+          delta = leasterLoserDelta
+        }
+      } else {
+        if (player.player_id === pickerId) {
+          role = 'Picker'
+          delta = pickerDelta
+        } else if (partnerId && player.player_id === partnerId) {
+          role = 'Partner'
+          delta = partnerDelta!
+        } else {
+          role = 'Opponent'
+          delta = opponentDelta
+        }
+      }
+
+      delta *= multiplier
+
+      if (isLeaster) {
+        if (role !== 'Leaster Winner') delta = -delta
+      } else if (result === 'Picker Loss') {
+        if (role === 'Picker' || role === 'Partner') delta = -delta
+      } else {
+        if (role === 'Opponent') delta = -delta
+      }
+
+      return { player_id: player.player_id, player_role: role, point_delta: delta }
+    })
+  }
+
+  submitRound() {
+    const gameId = this.newGameId()
+    const pickerId = this.roundPickerPlayerId()
+    const result = this.roundResult()
+    if (!gameId || !pickerId || !result) return
+
+    const scores = this.roundPlayerScores()
+    const editingId = this.editingRoundId()
+    const noSchneider = this.roundNoSchneider()
+    const noPartner = this.roundNoPartner()
+    const noTrick = this.roundNoTrick()
+
+    this.isSubmittingRound.set(true)
+
+    if (editingId) {
+      this.gamesService.updateRound(editingId, {
+        round_result: result,
+        no_schneider: noSchneider,
+        no_partner: noPartner,
+        no_trick: noTrick,
+        player_scores: scores
+      }).subscribe(() => {
+        this.roundHistory.update(h => h.map(entry => entry.round_id === editingId
+          ? { ...entry, round_result: result, no_schneider: noSchneider, no_partner: noPartner, no_trick: noTrick, scores }
+          : entry
+        ))
+        this.resetRoundForm()
+      })
+    } else {
+      const roundNumber = this.currentRoundNumber()
+      this.gamesService.createRound({
+        game_id: gameId,
+        round_number: roundNumber,
+        round_result: result,
+        no_schneider: noSchneider,
+        no_partner: noPartner,
+        no_trick: noTrick,
+        player_scores: scores
+      }).subscribe(created => {
+        this.roundHistory.update(h => [...h, {
+          round_id: created.round_id,
+          round_number: roundNumber,
+          round_result: result,
+          no_schneider: noSchneider,
+          no_partner: noPartner,
+          no_trick: noTrick,
+          scores
+        }])
+        this.currentRoundNumber.update(n => n + 1)
+        this.resetRoundForm()
+      })
+    }
+  }
+
+  editRound(entry: RoundHistoryEntry) {
+    const isLeaster = entry.round_result === 'Leaster'
+    const pickerScore = entry.scores.find(s => s.player_role === (isLeaster ? 'Leaster Winner' : 'Picker'))
+    const partnerScore = entry.scores.find(s => s.player_role === 'Partner')
+
+    this.roundPickerPlayerId.set(pickerScore?.player_id ?? null)
+    this.roundPartnerPlayerId.set(partnerScore?.player_id ?? null)
+    this.roundResult.set(entry.round_result)
+    this.roundNoSchneider.set(entry.no_schneider)
+    this.roundNoPartner.set(entry.no_partner)
+    this.roundNoTrick.set(entry.no_trick)
+    this.editingRoundId.set(entry.round_id)
+  }
+
+  cancelEditRound() {
+    this.resetRoundForm()
+  }
+
+  deleteRoundEntry(entry: RoundHistoryEntry) {
+    if (!confirm(`Delete Round ${entry.round_number}? This cannot be undone.`)) return
+    const gameId = this.newGameId()
+    this.gamesService.deleteRound(entry.round_id).subscribe(() => {
+      if (this.editingRoundId() === entry.round_id) this.resetRoundForm()
+      if (!gameId) return
+      this.gamesService.getGames().subscribe(games => {
+        this.gamesSignal.set(games)
+        const updatedGame = games.find(g => g.game_id === gameId)
+        if (updatedGame) this.refreshWizardRoundState(updatedGame)
+      })
+    })
+  }
+
+  finishGame() {
+    const gameId = this.newGameId()
+    if (!gameId) return
+    this.gamesService.completeGame(gameId).subscribe(() => {
+      this.closeWizard()
+    })
+  }
+
+  closeWizard() {
+    this.refreshGames()
+    this.gameWizardDialog.nativeElement.close()
+    this.step.set('idle')
+  }
+
+  toggleNoPartner(value: boolean) {
+    this.roundNoPartner.set(value)
+    if (value) this.roundPartnerPlayerId.set(null)
+  }
+
+  toggleNoSchneider(value: boolean) {
+    this.roundNoSchneider.set(value)
+    if (!value) this.roundNoTrick.set(false)
+  }
+
+  availablePlayers(): Player[] {
+    const selectedIds = new Set(this.newGamePlayers().map(p => p.player_id))
+    return this.existingPlayers().filter(p => !selectedIds.has(p.player_id))
+  }
+
+  getPlayerName(playerId: number): string {
+    return this.newGamePlayers().find(p => p.player_id === playerId)?.player_name ?? ''
+  }
+
+  roleClass(role: string): string {
+    return 'role--' + role.replace(/\s+/g, '_')
+  }
+
+  getSelectedGamePlayers(): Player[] {
+    return this.selectedGame?.Players_X_Games.map(pxg => pxg.Players) ?? []
+  }
+
+  selectedGameScoreTable(): ScoreTable {
+    if (!this.selectedGame) return { players: [], initials: new Map(), rows: [] }
+    const roundsData = this.selectedGame.Rounds.map(r => this.toHistoryEntry(r))
+    return this.buildScoreTable(this.getSelectedGamePlayers(), roundsData)
+  }
+
+  private toHistoryEntry(round: Round): RoundHistoryEntry {
+    return {
+      round_id: round.round_id,
+      round_number: round.round_number,
+      round_result: round.round_result,
+      no_schneider: round.no_schneider,
+      no_partner: round.no_partner,
+      no_trick: round.no_trick,
+      scores: round.PlayerRoundScore.map(s => ({ player_id: s.player_id, player_role: s.player_role, point_delta: s.point_delta }))
+    }
+  }
+
+  private resetRoundForm() {
+    this.roundPickerPlayerId.set(null)
+    this.roundPartnerPlayerId.set(null)
+    this.roundResult.set('')
+    this.roundNoSchneider.set(false)
+    this.roundNoPartner.set(false)
+    this.roundNoTrick.set(false)
+    this.editingRoundId.set(null)
+    this.isSubmittingRound.set(false)
+  }
+
+  private buildScoreTable(players: Player[], roundsData: RoundHistoryEntry[]): ScoreTable {
+    const sortedRounds = [...roundsData].sort((a, b) => a.round_number - b.round_number)
+    const runningTotals = new Map<number, number>(players.map(p => [p.player_id, 0]))
+
+    const rows: ScoreTableRow[] = sortedRounds.map(round => {
+      for (const score of round.scores) {
+        runningTotals.set(score.player_id, (runningTotals.get(score.player_id) ?? 0) + score.point_delta)
+      }
+      return { round_number: round.round_number, totals: new Map(runningTotals) }
+    })
+
+    return { players, initials: this.computePlayerInitials(players), rows }
+  }
+
+  private computePlayerInitials(players: Player[]): Map<number, string> {
+    const baseInitials = players.map(p => this.getBaseInitials(p.player_name))
+    const totalCounts = new Map<string, number>()
+    for (const initials of baseInitials) {
+      totalCounts.set(initials, (totalCounts.get(initials) ?? 0) + 1)
+    }
+
+    const seenCounts = new Map<string, number>()
+    const result = new Map<number, string>()
+    players.forEach((player, i) => {
+      const initials = baseInitials[i]
+      if ((totalCounts.get(initials) ?? 0) > 1) {
+        const occurrence = (seenCounts.get(initials) ?? 0) + 1
+        seenCounts.set(initials, occurrence)
+        result.set(player.player_id, `${initials}${occurrence}`)
+      } else {
+        result.set(player.player_id, initials)
+      }
+    })
+    return result
+  }
+
+  private getBaseInitials(name: string): string {
+    const tokens = name.trim().split(/\s+/).filter(Boolean)
+    if (tokens.length === 0) return '??'
+    if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase()
+    return (tokens[0][0] + tokens[tokens.length - 1][0]).toUpperCase()
+  }
 }

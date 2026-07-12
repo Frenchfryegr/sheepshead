@@ -1,26 +1,350 @@
-<div style="display: grid; grid-template-columns: auto auto;">
-    <div>Game Id</div>
-    <div> Number of Players</div>
-    @for (game of games(); track $index) {
-        <div (click)="selectGame(game.game_id)">{{game.game_id}}</div>
-        <div>{{game.num_players}}</div>
-    }
+<div class="games-container">
+  <div class="games-header">
+    <h1 class="games-title">Game History</h1>
+    <button class="btn btn-primary" (click)="startNewGame()">Start New Game</button>
+  </div>
+
+  @if (games().length === 0) {
+    <div class="empty-state">
+      <p>No games recorded yet. Click "Start New Game" to begin!</p>
+    </div>
+  } @else {
+    <div class="table-wrapper">
+      <table class="games-table">
+        <thead>
+          <tr>
+            <th class="sortable-header" (click)="toggleSort('game_datetime')">
+              Date / Time
+              @if (sortColumn() === 'game_datetime') {
+                <span class="sort-indicator">{{ sortDirection() === 'asc' ? '▲' : '▼' }}</span>
+              }
+            </th>
+            <th class="sortable-header" (click)="toggleSort('num_players')">
+              Players
+              @if (sortColumn() === 'num_players') {
+                <span class="sort-indicator">{{ sortDirection() === 'asc' ? '▲' : '▼' }}</span>
+              }
+            </th>
+            <th class="sortable-header" (click)="toggleSort('rounds')">
+              Rounds
+              @if (sortColumn() === 'rounds') {
+                <span class="sort-indicator">{{ sortDirection() === 'asc' ? '▲' : '▼' }}</span>
+              }
+            </th>
+            <th class="sortable-header" (click)="toggleSort('status')">
+              Status
+              @if (sortColumn() === 'status') {
+                <span class="sort-indicator">{{ sortDirection() === 'asc' ? '▲' : '▼' }}</span>
+              }
+            </th>
+            <th class="sortable-header" (click)="toggleSort('winner')">
+              Winner
+              @if (sortColumn() === 'winner') {
+                <span class="sort-indicator">{{ sortDirection() === 'asc' ? '▲' : '▼' }}</span>
+              }
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (game of sortedGames(); track game.game_id) {
+            <tr class="game-row" (click)="selectGame(game)">
+              <td>{{ game.game_datetime | date:'medium' }}</td>
+              <td>{{ game.num_players }}</td>
+              <td>{{ game.Rounds.length }}</td>
+              <td>
+                @if (game.is_completed) {
+                  <span class="badge badge-completed">Completed</span>
+                } @else {
+                  <span class="badge badge-in-progress">In Progress</span>
+                }
+              </td>
+              <td>{{ getGameWinnerName(game) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 </div>
 
-<button (click)="DialogAddGame.showModal()">Add Game</button>
-
-<dialog #DialogAddGame>
-    add a new game
+<dialog #ShowGameRounds class="dialog">
+  <div class="dialog-header">
+    <h2>Game #{{ selectedGame?.game_id }}</h2>
+    <button class="btn-close" (click)="showGameRoundsDialog.nativeElement.close()">&times;</button>
+  </div>
+  <div class="dialog-body">
+    @if (selectedGame) {
+      @if (selectedGameScoreTable().rows.length > 0) {
+        <div class="form-group">
+          <label>Running Totals</label>
+          <div class="table-wrapper">
+            <table class="score-table">
+              <thead>
+                <tr>
+                  <th>Round</th>
+                  @for (player of selectedGameScoreTable().players; track player.player_id) {
+                    <th>{{ selectedGameScoreTable().initials.get(player.player_id) }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of selectedGameScoreTable().rows; track row.round_number) {
+                  <tr>
+                    <td>{{ row.round_number }}</td>
+                    @for (player of selectedGameScoreTable().players; track player.player_id) {
+                      <td [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0" [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0">
+                        {{ row.totals.get(player.player_id) }}
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+      <div class="rounds-list">
+        @for (round of selectedGame.Rounds; track round.round_id) {
+          <div class="round-card">
+            <div class="round-card__header">
+              <span class="round-number">Round {{ round.round_number }}</span>
+              <span class="round-result" [class]="'round-result--' + (round.round_result === 'Picker Win' ? 'win' : round.round_result === 'Picker Loss' ? 'loss' : 'leaster')">{{ round.round_result }}</span>
+            </div>
+            <div class="round-card__details">
+              @if (round.no_partner) {
+                <span class="round-tag">No Partner</span>
+              }
+              @if (round.no_schneider) {
+                <span class="round-tag">No Schneider</span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+  <div class="dialog-footer">
+    <button class="btn btn-secondary" (click)="showGameRoundsDialog.nativeElement.close()">Close</button>
+  </div>
 </dialog>
 
-<!-- <dialog #ShowGameRounds> -->
-    <div style="display: grid; grid-template-columns: auto;">
-    @if (selectedGame) {
-        @for (round of selectedGame.Rounds; track round.round_id) {
-            <div>{{ round.round_id }} - {{ round.round_result }}</div>
-        }
-        } @else {
-        <div>No game selected.</div>
-    }
+<dialog #GameWizardDialog class="dialog dialog-wizard">
+  @if (step() === 'players') {
+    <div class="dialog-header">
+      <h2>New Game</h2>
+      <button class="btn-close" (click)="gameWizardDialog.nativeElement.close(); step.set('idle')">&times;</button>
     </div>
-<!-- </dialog> -->
+    <div class="dialog-body">
+      <div class="form-group">
+        <label>Select existing players</label>
+        <div class="player-select-list">
+          @for (player of availablePlayers(); track player.player_id) {
+            <div class="player-option" (click)="addExistingPlayer(player)">
+              <span>{{ player.player_name }}</span>
+              <span class="player-add-icon">+</span>
+            </div>
+          }
+          @if (availablePlayers().length === 0 && existingPlayers().length > 0) {
+            <p class="text-muted">All existing players have been added.</p>
+          }
+          @if (existingPlayers().length === 0) {
+            <p class="text-muted">No existing players found. Add a new player below.</p>
+          }
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Add new player</label>
+        <div class="input-row">
+          <input
+            class="input"
+            type="text"
+            placeholder="Enter player name"
+            [ngModel]="newPlayerName()"
+            (ngModelChange)="newPlayerName.set($event)"
+            (keyup.enter)="addNewPlayer()"
+          />
+          <button class="btn btn-secondary" (click)="addNewPlayer()" [disabled]="!newPlayerName().trim()">Add</button>
+        </div>
+      </div>
+
+      @if (newGamePlayers().length > 0) {
+        <div class="form-group">
+          <label>Players in this game ({{ newGamePlayers().length }})</label>
+          <div class="player-chips">
+            @for (player of newGamePlayers(); track player.player_id; let i = $index) {
+              <div class="player-chip">
+                <span>{{ player.player_name }}</span>
+                <button class="chip-remove" (click)="removePlayer(i)">&times;</button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-secondary" (click)="gameWizardDialog.nativeElement.close(); step.set('idle')">Cancel</button>
+      <button class="btn btn-primary" (click)="submitGame()" [disabled]="newGamePlayers().length < 2">Start Game</button>
+    </div>
+  }
+
+  @if (step() === 'rounds') {
+    <div class="dialog-header">
+      <h2>{{ editingRoundId() ? 'Edit Round' : 'Round ' + currentRoundNumber() }}</h2>
+      <button class="btn-close" (click)="closeWizard()">&times;</button>
+    </div>
+    <div class="dialog-body">
+      <div class="form-group">
+        <label>Round result</label>
+        <select class="input" [ngModel]="roundResult()" (ngModelChange)="roundResult.set($event)">
+          <option value="" disabled>Select result</option>
+          <option value="Picker Win">Picker Win</option>
+          <option value="Picker Loss">Picker Loss</option>
+          <option value="Leaster">Leaster</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>{{ isLeasterRound() ? 'Leaster Winner' : 'Picker' }}</label>
+        <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="roundPartnerPlayerId.set(null); roundPickerPlayerId.set($event)">
+          <option [ngValue]="null" disabled>Select player</option>
+          @for (player of newGamePlayers(); track player.player_id) {
+            <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+          }
+        </select>
+      </div>
+
+      @if (showPartnerSelect()) {
+        <div class="form-group">
+          <label>Partner</label>
+          <select class="input" [ngModel]="roundPartnerPlayerId()" (ngModelChange)="roundPartnerPlayerId.set($event)">
+            <option [ngValue]="null" disabled>Select partner</option>
+            @for (player of newGamePlayers(); track player.player_id) {
+              @if (player.player_id !== roundPickerPlayerId()) {
+                <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+              }
+            }
+          </select>
+        </div>
+      }
+
+      @if (!isLeasterRound()) {
+        <div class="form-group">
+          <label>Modifiers</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" [ngModel]="roundNoSchneider()" (ngModelChange)="toggleNoSchneider($event)" />
+              No Schneider (x2)
+            </label>
+            @if (roundNoSchneider()) {
+              <label class="checkbox-label checkbox-label--nested">
+                <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
+                No Trick (x3)
+              </label>
+            }
+            @if (showNoPartnerCheckbox()) {
+              <label class="checkbox-label">
+                <input type="checkbox" [ngModel]="roundNoPartner()" (ngModelChange)="toggleNoPartner($event)" />
+                No Partner
+              </label>
+            }
+          </div>
+        </div>
+      }
+
+      @if (roundPickerPlayerId() && roundResult()) {
+        <div class="form-group">
+          <label>Round summary</label>
+          <div class="score-preview">
+            @for (score of roundPlayerScores(); track score.player_id) {
+              <div class="score-row">
+                <span class="score-player">{{ getPlayerName(score.player_id) }}</span>
+                <span class="score-role" [class]="roleClass(score.player_role)">{{ score.player_role }}</span>
+                <span class="score-delta" [class.delta-positive]="score.point_delta >= 0" [class.delta-negative]="score.point_delta < 0">
+                  {{ score.point_delta >= 0 ? '+' : '' }}{{ score.point_delta }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (activeScoreTable().rows.length > 0) {
+        <div class="form-group">
+          <label>Running Totals</label>
+          <div class="table-wrapper">
+            <table class="score-table">
+              <thead>
+                <tr>
+                  <th>Round</th>
+                  @for (player of activeScoreTable().players; track player.player_id) {
+                    <th>{{ activeScoreTable().initials.get(player.player_id) }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of activeScoreTable().rows; track row.round_number) {
+                  <tr>
+                    <td>{{ row.round_number }}</td>
+                    @for (player of activeScoreTable().players; track player.player_id) {
+                      <td [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0" [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0">
+                        {{ row.totals.get(player.player_id) }}
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      @if (roundHistory().length > 0) {
+        <div class="form-group">
+          <label>Rounds Played</label>
+          <div class="rounds-list">
+            @for (entry of roundHistory(); track entry.round_id) {
+              <div class="round-card" [class.round-card--editing]="editingRoundId() === entry.round_id">
+                <div class="round-card__header">
+                  <span class="round-number">Round {{ entry.round_number }}</span>
+                  <span class="round-result" [class]="'round-result--' + (entry.round_result === 'Picker Win' ? 'win' : entry.round_result === 'Picker Loss' ? 'loss' : 'leaster')">{{ entry.round_result }}</span>
+                </div>
+                <div class="round-card__details">
+                  @if (entry.no_partner) {
+                    <span class="round-tag">No Partner</span>
+                  }
+                  @if (entry.no_schneider) {
+                    <span class="round-tag">No Schneider</span>
+                  }
+                  @if (entry.no_trick) {
+                    <span class="round-tag">No Trick</span>
+                  }
+                </div>
+                <div class="round-card__actions">
+                  <button class="btn btn-secondary btn-sm" (click)="editRound(entry)">Edit</button>
+                  <button class="btn btn-danger btn-sm" (click)="deleteRoundEntry(entry)">Delete</button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+    <div class="dialog-footer">
+      @if (editingRoundId()) {
+        <button class="btn btn-secondary" (click)="cancelEditRound()">Cancel Edit</button>
+      } @else {
+        <button class="btn btn-secondary" (click)="finishGame()">Finish Game</button>
+      }
+      <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound()">
+        @if (isSubmittingRound()) {
+          Submitting...
+        } @else if (editingRoundId()) {
+          Update Round
+        } @else {
+          Submit Round
+        }
+      </button>
+    </div>
+  }
+</dialog>

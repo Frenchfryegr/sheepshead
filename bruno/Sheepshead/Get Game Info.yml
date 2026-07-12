@@ -1,0 +1,17 @@
+info:
+  name: Get Game Info
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{api_url}}/games"
+  auth:
+    type: bearer
+    token: sk-lm-KFtGYnmH:fan8Eet0ncB6kWcT9csG
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
