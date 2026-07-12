@@ -9,6 +9,12 @@
       <p>No games recorded yet. Click "Start New Game" to begin!</p>
     </div>
   } @else {
+    <div class="mobile-sort-bar">
+      <span class="mobile-sort-label">Sort by Date</span>
+      <button class="btn-sort-direction" (click)="toggleDateSort()">
+        {{ sortDirection() === 'asc' ? '▲ Oldest First' : '▼ Newest First' }}
+      </button>
+    </div>
     <div class="table-wrapper">
       <table class="games-table">
         <thead>
@@ -48,17 +54,17 @@
         <tbody>
           @for (game of sortedGames(); track game.game_id) {
             <tr class="game-row" (click)="selectGame(game)">
-              <td>{{ game.game_datetime | date:'medium' }}</td>
-              <td>{{ game.num_players }}</td>
-              <td>{{ game.Rounds.length }}</td>
-              <td>
+              <td data-label="Date">{{ game.game_datetime | date:'short' }}</td>
+              <td data-label="Players">{{ game.num_players }}</td>
+              <td data-label="Rounds">{{ game.Rounds.length }}</td>
+              <td data-label="Status">
                 @if (game.is_completed) {
                   <span class="badge badge-completed">Completed</span>
                 } @else {
                   <span class="badge badge-in-progress">In Progress</span>
                 }
               </td>
-              <td>{{ getGameWinnerName(game) }}</td>
+              <td data-label="Winner">{{ getGameWinnerName(game) }}</td>
             </tr>
           }
         </tbody>
@@ -144,18 +150,34 @@
     <div class="dialog-body">
       <div class="form-group">
         <label>Select existing players</label>
-        <div class="player-select-list">
-          @for (player of availablePlayers(); track player.player_id) {
-            <div class="player-option" (click)="addExistingPlayer(player)">
-              <span>{{ player.player_name }}</span>
-              <span class="player-add-icon">+</span>
+        <div class="autocomplete">
+          <input
+            class="input"
+            type="text"
+            placeholder="Search players..."
+            [ngModel]="playerSearchQuery()"
+            (ngModelChange)="playerSearchQuery.set($event)"
+            (focus)="showPlayerDropdown.set(true)"
+            (blur)="onPlayerSearchBlur()"
+            (keydown.escape)="showPlayerDropdown.set(false)"
+          />
+          @if (showPlayerDropdown()) {
+            <div class="autocomplete-panel">
+              @if (filteredAvailablePlayers().length > 0) {
+                @for (player of filteredAvailablePlayers(); track player.player_id) {
+                  <div class="autocomplete-option" (mousedown)="$event.preventDefault()" (click)="selectExistingPlayer(player)">
+                    <span>{{ player.player_name }}</span>
+                    <span class="player-add-icon">+</span>
+                  </div>
+                }
+              } @else if (existingPlayers().length === 0) {
+                <p class="text-muted">No existing players found. Add a new player below.</p>
+              } @else if (availablePlayers().length === 0) {
+                <p class="text-muted">All existing players have been added.</p>
+              } @else {
+                <p class="text-muted">No players match "{{ playerSearchQuery() }}"</p>
+              }
             </div>
-          }
-          @if (availablePlayers().length === 0 && existingPlayers().length > 0) {
-            <p class="text-muted">All existing players have been added.</p>
-          }
-          @if (existingPlayers().length === 0) {
-            <p class="text-muted">No existing players found. Add a new player below.</p>
           }
         </div>
       </div>
@@ -171,7 +193,7 @@
             (ngModelChange)="newPlayerName.set($event)"
             (keyup.enter)="addNewPlayer()"
           />
-          <button class="btn btn-secondary" (click)="addNewPlayer()" [disabled]="!newPlayerName().trim()">Add</button>
+          <button class="btn btn-secondary btn-add-player" (click)="addNewPlayer()" [disabled]="!newPlayerName().trim()">+ Add Player</button>
         </div>
       </div>
 
