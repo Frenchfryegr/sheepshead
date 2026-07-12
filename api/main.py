@@ -32,9 +32,16 @@ load_dotenv()
 
 app = FastAPI(openapi_tags=tags_metadata)
 
+default_origins = "http://localhost:4200,http://127.0.0.1:4200"
+allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_ORIGINS", default_origins).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200", "http://127.0.0.1:4200"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

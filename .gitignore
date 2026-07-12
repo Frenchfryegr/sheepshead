@@ -4,3 +4,8 @@ angular/.vscode
 
 # environment files
 .env
+
+# python
+__pycache__/
+*.pyc
+.venv/

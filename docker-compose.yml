@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: ./api
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./angular
+      args:
+        API_URL: ${API_URL}
+    environment:
+      PORT: 4000
+    expose:
+      - "4000"
+    restart: unless-stopped
