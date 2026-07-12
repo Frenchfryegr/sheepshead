@@ -3,9 +3,9 @@ services:
     build:
       context: ./api
     environment:
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_KEY: ${SUPABASE_KEY}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_KEY: ${SUPABASE_KEY:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4200}
     expose:
       - "8000"
     restart: unless-stopped
@@ -14,7 +14,7 @@ services:
     build:
       context: ./angular
       args:
-        API_URL: ${API_URL}
+        API_URL: ${API_URL:-http://localhost:8000}
     environment:
       PORT: 4000
     expose:
