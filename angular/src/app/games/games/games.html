@@ -267,16 +267,15 @@
 
       @if (!isLeasterRound()) {
         <div class="form-group">
-          <label>Modifiers</label>
           <div class="checkbox-group">
             <label class="checkbox-label">
               <input type="checkbox" [ngModel]="roundNoSchneider()" (ngModelChange)="toggleNoSchneider($event)" />
-              No Schneider (x2)
+              No Schneider
             </label>
             @if (roundNoSchneider()) {
               <label class="checkbox-label checkbox-label--nested">
                 <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
-                No Trick (x3)
+                No Trick
               </label>
             }
           </div>

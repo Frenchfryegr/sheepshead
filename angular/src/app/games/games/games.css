@@ -261,13 +261,13 @@
 }
 
 .rounds-dialog-footer .btn-primary {
-  width: 100%;
-  max-width: 320px;
+  width: 225px;
   padding: 14px 24px;
   font-size: 1rem;
 }
 
 .btn-subtle {
+  width: 150px;
   padding: 8px 18px;
   font-size: 0.85rem;
   box-shadow: none;
@@ -861,7 +861,7 @@
   }
 
   .rounds-dialog-footer .btn-subtle {
-    width: auto;
+    width: 150px;
     padding: 8px 18px;
     font-size: 0.85rem;
   }
