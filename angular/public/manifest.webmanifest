@@ -1,0 +1,25 @@
+{
+  "name": "Sheepshead Score Tracker",
+  "short_name": "Sheepshead",
+  "description": "Track scores for Sheepshead card games",
+  "start_url": "/",
+  "display": "standalone",
+  "scope": "/",
+  "orientation": "portrait",
+  "background_color": "#1a1a2e",
+  "theme_color": "#667eea",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
