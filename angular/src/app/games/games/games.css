@@ -77,6 +77,10 @@
   border-bottom: 1px solid #f3f4f6;
 }
 
+.mobile-sort-bar {
+  display: none;
+}
+
 .game-row {
   cursor: pointer;
   transition: background-color 0.15s ease;
@@ -308,31 +312,43 @@
 
 .input-row .input {
   flex: 1;
+  min-width: 0;
 }
 
-.player-select-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 200px;
-  overflow-y: auto;
+.btn-add-player {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.autocomplete-panel {
+  margin-top: 6px;
+  background: white;
   border: 1.5px solid #e5e7eb;
   border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 4px;
 }
 
-.player-option {
+.autocomplete-option {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
 
-.player-option:hover {
+.autocomplete-option:hover {
   background: #f3f4f6;
+}
+
+.autocomplete-panel .text-muted {
+  padding: 10px 12px;
+  text-align: left;
 }
 
 .player-add-icon {
@@ -672,6 +688,10 @@
 @media (max-width: 640px) {
   .games-container {
     padding: 12px;
+    padding-top: max(12px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
   .games-header {
@@ -686,22 +706,112 @@
     text-align: center;
   }
 
+  .mobile-sort-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    box-sizing: border-box;
+  }
+
+  .mobile-sort-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .btn-sort-direction {
+    flex-shrink: 0;
+    background: #f3f4f6;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
   .btn {
     width: 100%;
     padding: 12px 16px;
     font-size: 1rem;
   }
 
-  .table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  .input-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .games-table th,
-  .games-table td {
-    padding: 10px 12px;
+  .input-row .btn-add-player {
+    width: auto;
+    align-self: flex-start;
+    padding: 8px 16px;
     font-size: 0.85rem;
-    white-space: nowrap;
+  }
+
+  .table-wrapper {
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .games-table thead {
+    display: none;
+  }
+
+  .games-table,
+  .games-table tbody,
+  .games-table tr,
+  .games-table td {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .games-table tr.game-row {
+    margin-bottom: 10px;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+  }
+
+  .games-table tr.game-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .games-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    text-align: right;
+    white-space: normal;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .games-table tr.game-row td:last-child {
+    border-bottom: none;
+  }
+
+  .games-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    text-align: left;
   }
 
   .dialog {
@@ -713,9 +823,30 @@
     margin: 0;
   }
 
+  .dialog-header {
+    padding-top: max(20px, env(safe-area-inset-top, 0px));
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+
+  .dialog-body {
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+
   .dialog-footer {
     flex-direction: column-reverse;
     gap: 8px;
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+
+  .dialog-footer:not(.rounds-dialog-footer) {
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .dialog-danger-zone {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   }
 
   .dialog-footer.rounds-dialog-footer {
@@ -744,7 +875,7 @@
     flex: 1 1 100%;
   }
 
-  .player-select-list {
+  .autocomplete-panel {
     max-height: 160px;
   }
 }

@@ -58,6 +58,8 @@ export class Games {
   existingPlayers = signal<Player[]>([])
   newGamePlayers = signal<Player[]>([])
   newPlayerName = signal('')
+  playerSearchQuery = signal('')
+  showPlayerDropdown = signal(false)
   newGameId = signal<number | null>(null)
   currentRoundNumber = signal(1)
   roundPickerPlayerId = signal<number | null>(null)
@@ -85,6 +87,15 @@ export class Games {
 
   refreshGames() {
     this.gamesService.getGames().subscribe(games => this.gamesSignal.set(games))
+  }
+
+  toggleDateSort() {
+    if (this.sortColumn() === 'game_datetime') {
+      this.sortDirection.update(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      this.sortColumn.set('game_datetime')
+      this.sortDirection.set('desc')
+    }
   }
 
   toggleSort(column: GameSortColumn) {
@@ -185,6 +196,8 @@ export class Games {
     this.step.set('players')
     this.newGamePlayers.set([])
     this.newPlayerName.set('')
+    this.playerSearchQuery.set('')
+    this.showPlayerDropdown.set(false)
     this.newGameId.set(null)
     this.currentRoundNumber.set(1)
     this.roundHistory.set([])
@@ -200,6 +213,15 @@ export class Games {
     if (!current.find(p => p.player_id === player.player_id)) {
       this.newGamePlayers.set([...current, player])
     }
+  }
+
+  selectExistingPlayer(player: Player) {
+    this.addExistingPlayer(player)
+    this.playerSearchQuery.set('')
+  }
+
+  onPlayerSearchBlur() {
+    setTimeout(() => this.showPlayerDropdown.set(false), 100)
   }
 
   addNewPlayer() {
@@ -405,6 +427,13 @@ export class Games {
   availablePlayers(): Player[] {
     const selectedIds = new Set(this.newGamePlayers().map(p => p.player_id))
     return this.existingPlayers().filter(p => !selectedIds.has(p.player_id))
+  }
+
+  filteredAvailablePlayers(): Player[] {
+    const query = this.playerSearchQuery().trim().toLowerCase()
+    const available = this.availablePlayers()
+    if (!query) return available
+    return available.filter(p => p.player_name.toLowerCase().includes(query))
   }
 
   getPlayerName(playerId: number): string {
