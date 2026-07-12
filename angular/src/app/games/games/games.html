@@ -83,16 +83,20 @@
                 <tr>
                   <th>Round</th>
                   @for (player of selectedGameScoreTable().players; track player.player_id) {
-                    <th>{{ selectedGameScoreTable().initials.get(player.player_id) }}</th>
+                    <th [class.winner-cell]="selectedGameScoreTable().winnerIds.has(player.player_id)">{{ selectedGameScoreTable().initials.get(player.player_id) }}</th>
                   }
                 </tr>
               </thead>
               <tbody>
-                @for (row of selectedGameScoreTable().rows; track row.round_number) {
+                @for (row of selectedGameScoreTable().rows; track row.round_number; let last = $last) {
                   <tr>
                     <td>{{ row.round_number }}</td>
                     @for (player of selectedGameScoreTable().players; track player.player_id) {
-                      <td [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0" [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0">
+                      <td
+                        [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0"
+                        [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0"
+                        [class.winner-cell]="last && selectedGameScoreTable().winnerIds.has(player.player_id)"
+                      >
                         {{ row.totals.get(player.player_id) }}
                       </td>
                     }
@@ -125,6 +129,9 @@
   </div>
   <div class="dialog-footer">
     <button class="btn btn-secondary" (click)="showGameRoundsDialog.nativeElement.close()">Close</button>
+  </div>
+  <div class="dialog-danger-zone">
+    <button class="btn-link-danger" (click)="deleteSelectedGame()">Delete Game</button>
   </div>
 </dialog>
 
@@ -278,16 +285,20 @@
                 <tr>
                   <th>Round</th>
                   @for (player of activeScoreTable().players; track player.player_id) {
-                    <th>{{ activeScoreTable().initials.get(player.player_id) }}</th>
+                    <th [class.winner-cell]="activeScoreTable().winnerIds.has(player.player_id)">{{ activeScoreTable().initials.get(player.player_id) }}</th>
                   }
                 </tr>
               </thead>
               <tbody>
-                @for (row of activeScoreTable().rows; track row.round_number) {
+                @for (row of activeScoreTable().rows; track row.round_number; let last = $last) {
                   <tr>
                     <td>{{ row.round_number }}</td>
                     @for (player of activeScoreTable().players; track player.player_id) {
-                      <td [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0" [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0">
+                      <td
+                        [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0"
+                        [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0"
+                        [class.winner-cell]="last && activeScoreTable().winnerIds.has(player.player_id)"
+                      >
                         {{ row.totals.get(player.player_id) }}
                       </td>
                     }
@@ -302,27 +313,14 @@
       @if (roundHistory().length > 0) {
         <div class="form-group">
           <label>Rounds Played</label>
-          <div class="rounds-list">
+          <div class="rounds-list rounds-list--compact">
             @for (entry of roundHistory(); track entry.round_id) {
-              <div class="round-card" [class.round-card--editing]="editingRoundId() === entry.round_id">
-                <div class="round-card__header">
-                  <span class="round-number">Round {{ entry.round_number }}</span>
-                  <span class="round-result" [class]="'round-result--' + (entry.round_result === 'Picker Win' ? 'win' : entry.round_result === 'Picker Loss' ? 'loss' : 'leaster')">{{ entry.round_result }}</span>
-                </div>
-                <div class="round-card__details">
-                  @if (entry.no_partner) {
-                    <span class="round-tag">No Partner</span>
-                  }
-                  @if (entry.no_schneider) {
-                    <span class="round-tag">No Schneider</span>
-                  }
-                  @if (entry.no_trick) {
-                    <span class="round-tag">No Trick</span>
-                  }
-                </div>
-                <div class="round-card__actions">
-                  <button class="btn btn-secondary btn-sm" (click)="editRound(entry)">Edit</button>
-                  <button class="btn btn-danger btn-sm" (click)="deleteRoundEntry(entry)">Delete</button>
+              <div class="round-row" [class.round-row--editing]="editingRoundId() === entry.round_id">
+                <span class="round-row__number">Round {{ entry.round_number }}</span>
+                <span class="round-result" [class]="'round-result--' + (entry.round_result === 'Picker Win' ? 'win' : entry.round_result === 'Picker Loss' ? 'loss' : 'leaster')">{{ entry.round_result }}</span>
+                <div class="round-row__actions">
+                  <button class="btn-icon" (click)="editRound(entry)" aria-label="Edit round">Edit</button>
+                  <button class="btn-icon btn-icon-danger" (click)="deleteRoundEntry(entry)" aria-label="Delete round">Delete</button>
                 </div>
               </div>
             }
@@ -330,12 +328,7 @@
         </div>
       }
     </div>
-    <div class="dialog-footer">
-      @if (editingRoundId()) {
-        <button class="btn btn-secondary" (click)="cancelEditRound()">Cancel Edit</button>
-      } @else {
-        <button class="btn btn-secondary" (click)="finishGame()">Finish Game</button>
-      }
+    <div class="dialog-footer rounds-dialog-footer">
       <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound()">
         @if (isSubmittingRound()) {
           Submitting...
@@ -345,6 +338,11 @@
           Submit Round
         }
       </button>
+      @if (editingRoundId()) {
+        <button class="btn btn-secondary btn-subtle" (click)="cancelEditRound()">Cancel Edit</button>
+      } @else {
+        <button class="btn btn-success btn-subtle" (click)="finishGame()">Finish Game</button>
+      }
     </div>
     <div class="dialog-danger-zone">
       <button class="btn-link-danger" (click)="deleteCurrentGame()">Delete Game</button>

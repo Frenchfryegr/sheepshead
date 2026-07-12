@@ -24,6 +24,7 @@ interface ScoreTable {
   players: Player[]
   initials: Map<number, string>
   rows: ScoreTableRow[]
+  winnerIds: Set<number>
 }
 
 type GameSortColumn = 'game_datetime' | 'num_players' | 'rounds' | 'status' | 'winner'
@@ -135,10 +136,22 @@ export class Games {
   deleteCurrentGame() {
     const gameId = this.newGameId()
     if (!gameId) return
-    if (!confirm('Delete this game? This will permanently remove all of its rounds and scores.')) return
-    this.gamesService.deleteGame(gameId).subscribe(() => {
-      this.closeWizard()
+    this.confirmAndDeleteGame(gameId, () => this.closeWizard())
+  }
+
+  deleteSelectedGame() {
+    const gameId = this.selectedGame?.game_id
+    if (!gameId) return
+    this.confirmAndDeleteGame(gameId, () => {
+      this.showGameRoundsDialog.nativeElement.close()
+      this.selectedGame = null
+      this.refreshGames()
     })
+  }
+
+  private confirmAndDeleteGame(gameId: number, onSuccess: () => void) {
+    if (!confirm('Delete this game? This will permanently remove all of its rounds and scores.')) return
+    this.gamesService.deleteGame(gameId).subscribe(onSuccess)
   }
 
   selectGame(game: Game) {
@@ -407,9 +420,9 @@ export class Games {
   }
 
   selectedGameScoreTable(): ScoreTable {
-    if (!this.selectedGame) return { players: [], initials: new Map(), rows: [] }
+    if (!this.selectedGame) return { players: [], initials: new Map(), rows: [], winnerIds: new Set() }
     const roundsData = this.selectedGame.Rounds.map(r => this.toHistoryEntry(r))
-    return this.buildScoreTable(this.getSelectedGamePlayers(), roundsData)
+    return this.buildScoreTable(this.getSelectedGamePlayers(), roundsData, this.selectedGame.is_completed)
   }
 
   private toHistoryEntry(round: Round): RoundHistoryEntry {
@@ -435,7 +448,7 @@ export class Games {
     this.isSubmittingRound.set(false)
   }
 
-  private buildScoreTable(players: Player[], roundsData: RoundHistoryEntry[]): ScoreTable {
+  private buildScoreTable(players: Player[], roundsData: RoundHistoryEntry[], highlightWinner = false): ScoreTable {
     const sortedRounds = [...roundsData].sort((a, b) => a.round_number - b.round_number)
     const runningTotals = new Map<number, number>(players.map(p => [p.player_id, 0]))
 
@@ -446,7 +459,16 @@ export class Games {
       return { round_number: round.round_number, totals: new Map(runningTotals) }
     })
 
-    return { players, initials: this.computePlayerInitials(players), rows }
+    const lastRow = rows[rows.length - 1]
+    const winnerIds = new Set<number>()
+    if (highlightWinner && lastRow) {
+      const highestTotal = Math.max(...lastRow.totals.values())
+      for (const [playerId, total] of lastRow.totals) {
+        if (total === highestTotal) winnerIds.add(playerId)
+      }
+    }
+
+    return { players, initials: this.computePlayerInitials(players), rows, winnerIds }
   }
 
   private computePlayerInitials(players: Player[]): Map<number, string> {
