@@ -418,6 +418,7 @@ export class Games {
   finishGame() {
     const gameId = this.newGameId()
     if (!gameId) return
+    if (!confirm('Finish this game? You can still reopen it later by tapping its status badge.')) return
     this.gamesService.completeGame(gameId).subscribe(() => {
       this.closeWizard()
     })
@@ -427,6 +428,25 @@ export class Games {
     this.refreshGames()
     this.gameWizardDialog.nativeElement.close()
     this.step.set('idle')
+  }
+
+  onGameRoundsBackdropClick(event: MouseEvent) {
+    if (event.target !== event.currentTarget) return
+    this.showGameRoundsDialog.nativeElement.close()
+  }
+
+  scrollFieldIntoView(event: FocusEvent) {
+    (event.target as HTMLElement).scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+
+  onWizardBackdropClick(event: MouseEvent) {
+    if (event.target !== event.currentTarget) return
+    if (this.step() === 'rounds') {
+      this.closeWizard()
+    } else {
+      this.gameWizardDialog.nativeElement.close()
+      this.step.set('idle')
+    }
   }
 
   onPickerChange(playerId: number | null) {

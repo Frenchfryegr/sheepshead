@@ -7,16 +7,9 @@
 
 .games-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: 24px;
-}
-
-.games-title {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #1a1a2e;
 }
 
 .empty-state {
@@ -100,6 +93,13 @@
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+.badge-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
 }
 
 .badge-completed {
@@ -200,6 +200,11 @@
 }
 
 .btn-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   background: none;
   border: none;
   font-size: 1.5rem;
@@ -312,7 +317,7 @@
   padding: 10px 14px;
   border: 1.5px solid #d1d5db;
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: 16px;
   color: #374151;
   background: white;
   transition: border-color 0.15s ease;
@@ -396,6 +401,11 @@
 }
 
 .chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.8);
@@ -431,6 +441,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 10px 0;
   font-size: 0.95rem;
   color: #374151;
   cursor: pointer;
@@ -493,18 +504,22 @@
 
 .round-row__actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-left: auto;
 }
 
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
   background: none;
   border: none;
   color: #6b7280;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 8px 14px;
   border-radius: 6px;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
@@ -721,11 +736,6 @@
     margin-bottom: 16px;
   }
 
-  .games-title {
-    font-size: 1.4rem;
-    text-align: center;
-  }
-
   .mobile-sort-bar {
     display: flex;
     align-items: center;
@@ -747,15 +757,25 @@
 
   .btn-sort-direction {
     flex-shrink: 0;
+    min-height: 44px;
     background: #f3f4f6;
     border: none;
     border-radius: 8px;
-    padding: 8px 14px;
+    padding: 8px 16px;
     font-size: 0.85rem;
     font-weight: 600;
     color: #374151;
     cursor: pointer;
     white-space: nowrap;
+  }
+
+  .rounds-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .round-row {
+    flex-wrap: wrap;
   }
 
   .btn {
@@ -813,7 +833,9 @@
     align-items: center;
     gap: 12px;
     padding: 10px 14px;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1a1a2e;
     text-align: right;
     white-space: normal;
     border-bottom: 1px solid #f3f4f6;
@@ -826,11 +848,11 @@
   .games-table td::before {
     content: attr(data-label);
     flex-shrink: 0;
-    font-weight: 600;
-    font-size: 0.75rem;
+    font-weight: 700;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #6b7280;
+    letter-spacing: 0.06em;
+    color: #667eea;
     text-align: left;
   }
 

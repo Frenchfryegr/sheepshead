@@ -1,6 +1,5 @@
 <div class="games-container">
   <div class="games-header">
-    <h1 class="games-title">Game History</h1>
     <button class="btn btn-primary" (click)="startNewGame()">Start New Game</button>
   </div>
 
@@ -73,7 +72,7 @@
   }
 </div>
 
-<dialog #ShowGameRounds class="dialog">
+<dialog #ShowGameRounds class="dialog" (click)="onGameRoundsBackdropClick($event)">
   <div class="dialog-header">
     <h2>Game #{{ selectedGame?.game_id }}</h2>
     <button class="btn-close" (click)="showGameRoundsDialog.nativeElement.close()">&times;</button>
@@ -141,7 +140,7 @@
   </div>
 </dialog>
 
-<dialog #GameWizardDialog class="dialog dialog-wizard">
+<dialog #GameWizardDialog class="dialog dialog-wizard" (click)="onWizardBackdropClick($event)">
   @if (step() === 'players') {
     <div class="dialog-header">
       <h2>New Game</h2>
@@ -192,6 +191,7 @@
               [ngModel]="newPlayerName()"
               (ngModelChange)="newPlayerName.set($event)"
               (keyup.enter)="addNewPlayer()"
+              (focus)="scrollFieldIntoView($event)"
             />
           }
           <button class="btn btn-secondary btn-add-player" (click)="handleAddPlayerClick()" [disabled]="addPlayerFormOpen() && !newPlayerName().trim()">
