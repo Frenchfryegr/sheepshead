@@ -120,18 +120,16 @@ export class Games {
       }
     }
 
-    let winnerId: number | null = null
-    let winnerTotal = -Infinity
-    for (const [playerId, total] of totals) {
-      if (total > winnerTotal) {
-        winnerTotal = total
-        winnerId = playerId
-      }
-    }
-    if (winnerId === null) return '—'
+    if (totals.size === 0) return '—'
+    const highestTotal = Math.max(...totals.values())
+    const winnerIds = new Set([...totals.entries()].filter(([, total]) => total === highestTotal).map(([playerId]) => playerId))
 
-    const winner = game.Players_X_Games.find(pxg => pxg.Players.player_id === winnerId)?.Players
-    return winner?.player_name ?? '—'
+    const winnerNames = game.Players_X_Games
+      .map(pxg => pxg.Players)
+      .filter(player => winnerIds.has(player.player_id))
+      .map(player => player.player_name)
+
+    return winnerNames.length > 0 ? winnerNames.join(', ') : '—'
   }
 
   selectGame(game: Game) {
