@@ -1,0 +1,26 @@
+<div style="display: grid; grid-template-columns: auto auto;">
+    <div>Game Id</div>
+    <div> Number of Players</div>
+    @for (game of games(); track $index) {
+        <div (click)="selectGame(game.game_id)">{{game.game_id}}</div>
+        <div>{{game.num_players}}</div>
+    }
+</div>
+
+<button (click)="DialogAddGame.showModal()">Add Game</button>
+
+<dialog #DialogAddGame>
+    add a new game
+</dialog>
+
+<!-- <dialog #ShowGameRounds> -->
+    <div style="display: grid; grid-template-columns: auto;">
+    @if (selectedGame) {
+        @for (round of selectedGame.Rounds; track round.round_id) {
+            <div>{{ round.round_id }} - {{ round.round_result }}</div>
+        }
+        } @else {
+        <div>No game selected.</div>
+    }
+    </div>
+<!-- </dialog> -->
