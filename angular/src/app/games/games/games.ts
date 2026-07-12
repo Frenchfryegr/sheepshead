@@ -58,6 +58,7 @@ export class Games {
   existingPlayers = signal<Player[]>([])
   newGamePlayers = signal<Player[]>([])
   newPlayerName = signal('')
+  addPlayerFormOpen = signal(false)
   playerSearchQuery = signal('')
   showPlayerDropdown = signal(false)
   newGameId = signal<number | null>(null)
@@ -196,6 +197,7 @@ export class Games {
     this.step.set('players')
     this.newGamePlayers.set([])
     this.newPlayerName.set('')
+    this.addPlayerFormOpen.set(false)
     this.playerSearchQuery.set('')
     this.showPlayerDropdown.set(false)
     this.newGameId.set(null)
@@ -224,6 +226,14 @@ export class Games {
     setTimeout(() => this.showPlayerDropdown.set(false), 100)
   }
 
+  handleAddPlayerClick() {
+    if (this.addPlayerFormOpen()) {
+      this.addNewPlayer()
+    } else {
+      this.addPlayerFormOpen.set(true)
+    }
+  }
+
   addNewPlayer() {
     const name = this.newPlayerName().trim()
     if (!name) return
@@ -242,7 +252,7 @@ export class Games {
 
   submitGame() {
     const players = this.newGamePlayers()
-    if (players.length < 2) return
+    if (players.length !== 3 && players.length !== 5) return
     this.gamesService.createGame({
       num_players: players.length,
       player_ids: players.map(p => p.player_id)

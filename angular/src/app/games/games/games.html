@@ -64,7 +64,7 @@
                   <span class="badge badge-in-progress">In Progress</span>
                 }
               </td>
-              <td data-label="Winner">{{ getGameWinnerName(game) }}</td>
+              <td [attr.data-label]="game.is_completed ? 'Winner' : 'Winning'">{{ getGameWinnerName(game) }}</td>
             </tr>
           }
         </tbody>
@@ -185,15 +185,23 @@
       <div class="form-group">
         <label>Add new player</label>
         <div class="input-row">
-          <input
-            class="input"
-            type="text"
-            placeholder="Enter player name"
-            [ngModel]="newPlayerName()"
-            (ngModelChange)="newPlayerName.set($event)"
-            (keyup.enter)="addNewPlayer()"
-          />
-          <button class="btn btn-secondary btn-add-player" (click)="addNewPlayer()" [disabled]="!newPlayerName().trim()">+ Add Player</button>
+          @if (addPlayerFormOpen()) {
+            <input
+              class="input"
+              type="text"
+              placeholder="Enter player name"
+              [ngModel]="newPlayerName()"
+              (ngModelChange)="newPlayerName.set($event)"
+              (keyup.enter)="addNewPlayer()"
+            />
+          }
+          <button class="btn btn-secondary btn-add-player" (click)="handleAddPlayerClick()" [disabled]="addPlayerFormOpen() && !newPlayerName().trim()">
+            @if (addPlayerFormOpen()) {
+              ✓ Add Player
+            } @else {
+              + New Player
+            }
+          </button>
         </div>
       </div>
 
@@ -213,7 +221,7 @@
     </div>
     <div class="dialog-footer">
       <button class="btn btn-secondary" (click)="gameWizardDialog.nativeElement.close(); step.set('idle')">Cancel</button>
-      <button class="btn btn-primary" (click)="submitGame()" [disabled]="newGamePlayers().length < 2">Start Game</button>
+      <button class="btn btn-primary" (click)="submitGame()" [disabled]="newGamePlayers().length !== 3 && newGamePlayers().length !== 5">Start Game</button>
     </div>
   }
 
