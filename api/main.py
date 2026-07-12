@@ -15,20 +15,26 @@ class TABLE_NAMES(Enum):
     ROUNDS = "Rounds"
 
 
+
+tags_metadata = [
+    {"name": "Default", "description": "idk if i even need this"},
+    {"name": "Game Management", "description": "do stuff to da games"},
+]
+
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(openapi_tags=tags_metadata)
 supabase: Client = create_client(
     os.environ.get("SUPABASE_URL"), 
     os.environ.get("SUPABASE_KEY")
 )
 
 
-@app.get("/")
+@app.get("/", tags=["Default"])
 def read_root():
-    return {"Bruh": "You made a request to the base endpoint. You prolly don't know what you're doing huh?"}
+    return {"Bruh": "You made a request to the base endpoint. You probably don't know what you're doing huh"}
 
-@app.get("/games")
+@app.get("/games", tags=["Game Management"])
 def get_games():
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
@@ -37,7 +43,7 @@ def get_games():
     )
     return response
 
-@app.post("/games/{game_id}")
+@app.post("/games/{game_id}", tags=["Game Management"])
 def insert_game(game_id):
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
@@ -46,7 +52,7 @@ def insert_game(game_id):
     )
     return response
 
-@app.delete("/games/{game_id}")
+@app.delete("/games/{game_id}", tags=["Game Management"])
 def delete_game(game_id):
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
