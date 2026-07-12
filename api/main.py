@@ -14,6 +14,10 @@ class TABLE_NAMES(Enum):
     PLAYERROUNDSCORE = "PlayerRoundScore"
     ROUNDS = "Rounds"
 
+class ROUND_RESULTS(Enum):
+    PICKER_WIN = "Picker Win"
+    PICKER_LOSS = "Picker Loss"
+    LEASTER = "Leaster"
 
 
 tags_metadata = [
@@ -38,10 +42,10 @@ def read_root():
 def get_games():
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
-        .select()
+        .select("*, Rounds(*)")
         .execute()
     )
-    return response
+    return response.data
 
 @app.post("/games/{game_id}", tags=["Game Management"])
 def insert_game(game_id):
@@ -50,7 +54,7 @@ def insert_game(game_id):
         .insert({"game_id": game_id, "game_datetime": datetime.now().isoformat()})
         .execute()
     )
-    return response
+    return response.data
 
 @app.delete("/games/{game_id}", tags=["Game Management"])
 def delete_game(game_id):
@@ -60,4 +64,23 @@ def delete_game(game_id):
         .eq("game_id", game_id)
         .execute()
     )
-    return response
+    return response.data
+
+@app.get("/rounds/{game_id}", tags=["Game Management"])
+def get_rounds_in_game(game_id):
+    response = (
+        supabase.table(TABLE_NAMES.GAMES.value)
+        .select(f"*, {TABLE_NAMES.ROUNDS.value}(*)")
+        .eq("game_id", game_id)
+        .execute()
+    )
+    return response.data
+
+@app.post("/rounds/{game_id}/{round_number}", tags=["Game Management"])
+def insert_round(game_id, round_number, round_result: ROUND_RESULTS ):
+    response = (
+        supabase.table(TABLE_NAMES.ROUNDS.value)
+        .insert({"game_id": game_id, "round_number": round_number, "round_result": round_result.value})
+        .execute()
+    )
+    return response.data
