@@ -112,6 +112,19 @@
   color: #92400e;
 }
 
+.badge-toggle {
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.badge-toggle:hover {
+  filter: brightness(0.95);
+}
+
+.badge-toggle:active {
+  transform: scale(0.95);
+}
+
 .badge-pending {
   background: #e5e7eb;
   color: #4b5563;

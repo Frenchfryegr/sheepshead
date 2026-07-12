@@ -106,6 +106,16 @@ def delete_game(game_id):
     )
     return response.data
 
+@app.patch("/games/{game_id}/status", tags=["Game Management"])
+def set_game_status(game_id, is_completed: bool = Body(..., embed=True)):
+    response = (
+        supabase.table(TABLE_NAMES.GAMES.value)
+        .update({"is_completed": is_completed})
+        .eq("game_id", game_id)
+        .execute()
+    )
+    return response.data[0]
+
 @app.patch("/games/{game_id}/complete", tags=["Game Management"])
 def complete_game(game_id):
     response = (

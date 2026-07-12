@@ -59,9 +59,9 @@
               <td data-label="Rounds">{{ game.Rounds.length }}</td>
               <td data-label="Status">
                 @if (game.is_completed) {
-                  <span class="badge badge-completed">Completed</span>
+                  <span class="badge badge-completed badge-toggle" (click)="toggleGameStatus(game, $event)">Completed</span>
                 } @else {
-                  <span class="badge badge-in-progress">In Progress</span>
+                  <span class="badge badge-in-progress badge-toggle" (click)="toggleGameStatus(game, $event)">In Progress</span>
                 }
               </td>
               <td [attr.data-label]="game.is_completed ? 'Winner' : 'Winning'">{{ getGameWinnerName(game) }}</td>

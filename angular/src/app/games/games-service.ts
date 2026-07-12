@@ -51,6 +51,10 @@ export class GamesService {
     return this.http.patch<Game>(`${environment.apiUrl}/${environment.games}/${gameId}/complete`, null)
   }
 
+  setGameStatus(gameId: number, isCompleted: boolean): Observable<Game> {
+    return this.http.patch<Game>(`${environment.apiUrl}/${environment.games}/${gameId}/status`, { is_completed: isCompleted })
+  }
+
   deleteGame(gameId: number): Observable<void> {
     return this.http.delete<void>(`${environment.apiUrl}/${environment.games}/${gameId}`)
   }

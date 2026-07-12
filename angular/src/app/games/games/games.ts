@@ -159,6 +159,13 @@ export class Games {
     })
   }
 
+  toggleGameStatus(game: Game, event: Event) {
+    event.stopPropagation()
+    this.gamesService.setGameStatus(game.game_id, !game.is_completed).subscribe(() => {
+      this.refreshGames()
+    })
+  }
+
   private confirmAndDeleteGame(gameId: number, onSuccess: () => void) {
     if (!confirm('Delete this game? This will permanently remove all of its rounds and scores.')) return
     this.gamesService.deleteGame(gameId).subscribe(onSuccess)
