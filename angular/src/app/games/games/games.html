@@ -284,7 +284,9 @@
           <span class="dialog-header__date">{{ formatGameDateTime(newGameDatetime()!) }}</span>
         }
       </div>
-      <button class="btn-close" (click)="closeWizard()">&times;</button>
+      @if (!addRoundFormOpen()) {
+        <button class="btn-close" (click)="closeWizard()">&times;</button>
+      }
     </div>
     <div class="dialog-body">
       @if (!addRoundFormOpen()) {
