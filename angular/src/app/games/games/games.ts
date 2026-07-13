@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, formatDate } from '@angular/common';
 import { GamesService } from '../games-service';
 import { Game } from '../../interfaces/game';
 import { Player } from '../../interfaces/player';
@@ -495,6 +495,12 @@ export class Games {
 
   absScore(value: number | undefined): number {
     return Math.abs(value ?? 0)
+  }
+
+  formatGameDateTime(isoDateTime: string): string {
+    const datePart = formatDate(isoDateTime, 'EEE MMM d, y', 'en-US')
+    const timePart = formatDate(isoDateTime, 'h:mm a', 'en-US').replace(' ', '').toLowerCase()
+    return `${datePart}: ${timePart}`
   }
 
   getSelectedGamePlayers(): Player[] {
