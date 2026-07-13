@@ -39,7 +39,7 @@
             "outputMode": "server",
             "serviceWorker": "ngsw-config.json",
             "security": {
-              "allowedHosts": ["sheepsheadscores.com", "www.sheepsheadscores.com"]
+              "allowedHosts": ["sheepsheadscores.com", "www.sheepsheadscores.com", "test.sheepsheadscores.com"]
             },
             "ssr": {
               "entry": "src/server.ts"
