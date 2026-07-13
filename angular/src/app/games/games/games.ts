@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { AfterViewInit, Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { DatePipe, formatDate } from '@angular/common';
 import { GamesService } from '../games-service';
 import { Game } from '../../interfaces/game';
@@ -38,7 +38,7 @@ type SortDirection = 'asc' | 'desc'
   templateUrl: './games.html',
   styleUrl: './games.css',
 })
-export class Games {
+export class Games implements AfterViewInit {
   private gamesService = inject(GamesService)
   private gamesSignal = signal<Game[]>([])
   games = this.gamesSignal.asReadonly()
@@ -55,6 +55,32 @@ export class Games {
 
   @ViewChild('ShowGameRounds') showGameRoundsDialog!: ElementRef<HTMLDialogElement>
   @ViewChild('GameWizardDialog') gameWizardDialog!: ElementRef<HTMLDialogElement>
+
+  private savedScrollY = 0
+
+  ngAfterViewInit() {
+    this.showGameRoundsDialog.nativeElement.addEventListener('close', () => this.unlockBodyScroll())
+    this.gameWizardDialog.nativeElement.addEventListener('close', () => this.unlockBodyScroll())
+  }
+
+  private showDialogModal(dialog: HTMLDialogElement) {
+    this.lockBodyScroll()
+    dialog.showModal()
+  }
+
+  private lockBodyScroll() {
+    this.savedScrollY = window.scrollY
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${this.savedScrollY}px`
+    document.body.style.width = '100%'
+  }
+
+  private unlockBodyScroll() {
+    document.body.style.position = ''
+    document.body.style.top = ''
+    document.body.style.width = ''
+    window.scrollTo(0, this.savedScrollY)
+  }
 
   step = signal<'idle' | 'players' | 'rounds'>('idle')
   existingPlayers = signal<Player[]>([])
@@ -176,7 +202,7 @@ export class Games {
   selectGame(game: Game) {
     this.selectedGame = game
     if (game.is_completed) {
-      this.showGameRoundsDialog.nativeElement.showModal()
+      this.showDialogModal(this.showGameRoundsDialog.nativeElement)
     } else {
       this.resumeGame(game)
     }
@@ -190,7 +216,7 @@ export class Games {
     this.refreshWizardRoundState(game)
     this.resetRoundForm()
     this.step.set('rounds')
-    this.gameWizardDialog.nativeElement.showModal()
+    this.showDialogModal(this.gameWizardDialog.nativeElement)
   }
 
   private refreshWizardRoundState(game: Game) {
@@ -214,7 +240,7 @@ export class Games {
     this.gamesService.getPlayers().subscribe(players => {
       this.existingPlayers.set(players)
     })
-    this.gameWizardDialog.nativeElement.showModal()
+    this.showDialogModal(this.gameWizardDialog.nativeElement)
   }
 
   addExistingPlayer(player: Player) {
