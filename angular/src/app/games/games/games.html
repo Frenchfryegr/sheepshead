@@ -258,21 +258,18 @@
 
   @if (step() === 'rounds') {
     <div class="dialog-header">
-      <h2>{{ editingRoundId() ? 'Edit Round' : 'Round ' + currentRoundNumber() }}</h2>
+      <div class="dialog-header__title">
+        <h2>{{ editingRoundId() ? 'Editing Round ' + activeRoundNumber() : 'Game ' + newGameId() }}</h2>
+        @if (!editingRoundId() && newGameDatetime()) {
+          <span class="dialog-header__date">{{ formatGameDateTime(newGameDatetime()!) }}</span>
+        }
+      </div>
       <button class="btn-close" (click)="closeWizard()">&times;</button>
     </div>
     <div class="dialog-body">
-      <div class="form-row">
-        <div class="form-group">
-          <label>{{ isLeasterRound() ? 'Leaster Winner' : 'Picker' }}</label>
-          <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
-            <option [ngValue]="null" disabled>Select player</option>
-            @for (player of newGamePlayers(); track player.player_id) {
-              <option [ngValue]="player.player_id">{{ player.player_name }}</option>
-            }
-          </select>
-        </div>
-
+      @if (!addRoundFormOpen()) {
+        <button class="btn btn-primary btn-add-round" (click)="addRoundFormOpen.set(true)">+ Add Round {{ currentRoundNumber() }}</button>
+      } @else {
         <div class="form-group">
           <label>Round result</label>
           <select class="input" [ngModel]="roundResult()" (ngModelChange)="roundResult.set($event)">
@@ -282,42 +279,68 @@
             <option value="Leaster">Leaster</option>
           </select>
         </div>
-      </div>
 
-      @if (showPartnerSelect()) {
-        <div class="form-group">
-          <label>Partner</label>
-          <select class="input" [ngModel]="partnerSelectValue()" (ngModelChange)="onPartnerChange($event)">
-            <option [ngValue]="-1">No Partner</option>
-            @for (player of newGamePlayers(); track player.player_id) {
-              @if (player.player_id !== roundPickerPlayerId()) {
-                <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+        @if (roundResult()) {
+          @if (isLeasterRound()) {
+            <div class="form-group">
+              <label>Leaster Winner</label>
+              <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
+                <option [ngValue]="null" disabled>Select player</option>
+                @for (player of newGamePlayers(); track player.player_id) {
+                  <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+                }
+              </select>
+            </div>
+          } @else {
+            <div class="form-row">
+              <div class="form-group">
+                <label>Picker</label>
+                <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
+                  <option [ngValue]="null" disabled>Select player</option>
+                  @for (player of newGamePlayers(); track player.player_id) {
+                    <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+                  }
+                </select>
+              </div>
+
+              @if (showPartnerSelect()) {
+                <div class="form-group">
+                  <label>Partner</label>
+                  <select class="input" [ngModel]="partnerSelectValue()" (ngModelChange)="onPartnerChange($event)">
+                    <option [ngValue]="-1">No Partner</option>
+                    @for (player of newGamePlayers(); track player.player_id) {
+                      @if (player.player_id !== roundPickerPlayerId()) {
+                        <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+                      }
+                    }
+                  </select>
+                </div>
               }
-            }
-          </select>
-        </div>
-      }
+            </div>
+          }
+        }
 
-      @if (!isLeasterRound()) {
-        <div class="form-group">
-          <div class="checkbox-group">
-            <label class="checkbox-label">
-              <input type="checkbox" [ngModel]="roundNoSchneider()" (ngModelChange)="toggleNoSchneider($event)" />
-              No Schneider
-            </label>
-            @if (roundNoSchneider()) {
+        @if (roundResult() && !isLeasterRound()) {
+          <div class="form-group">
+            <div class="checkbox-group">
               <label class="checkbox-label">
-                <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
-                No Trick
+                <input type="checkbox" [ngModel]="roundNoSchneider()" (ngModelChange)="toggleNoSchneider($event)" />
+                No Schneider
               </label>
-            }
+              @if (roundNoSchneider()) {
+                <label class="checkbox-label">
+                  <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
+                  No Trick
+                </label>
+              }
+            </div>
           </div>
-        </div>
+        }
       }
 
       @if (roundPickerPlayerId() && roundResult()) {
         <div class="form-group">
-          <label>Round summary</label>
+          <label>Round {{ activeRoundNumber() }} Summary</label>
           <div class="score-preview">
             @for (score of roundPlayerScores(); track score.player_id) {
               <div class="score-row">
@@ -334,9 +357,28 @@
         </div>
       }
 
-      @if (activeScoreTable().rows.length > 0) {
-        <div class="form-group">
-          <label>Running Totals</label>
+      @if (addRoundFormOpen()) {
+        <div class="mobile-round-summary-actions">
+          <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound()">
+            @if (isSubmittingRound()) {
+              Submitting...
+            } @else if (editingRoundId()) {
+              Update Round {{ activeRoundNumber() }}
+            } @else {
+              Submit Round {{ activeRoundNumber() }}
+            }
+          </button>
+          @if (editingRoundId()) {
+            <button class="btn btn-secondary btn-subtle" (click)="cancelEditRound()">Cancel</button>
+          } @else {
+            <button class="btn btn-secondary btn-subtle" (click)="cancelAddRound()">Cancel</button>
+          }
+        </div>
+      }
+
+      <div class="form-group" [class.mobile-hidden-when-summary]="addRoundFormOpen()">
+        @if (activeScoreTable().rows.length > 0) {
+          <label class="scoreboard-label">Scoreboard</label>
           <div class="table-wrapper">
             <table class="score-table">
               <thead>
@@ -374,12 +416,12 @@
               </tbody>
             </table>
           </div>
-        </div>
-      }
+        }
+      </div>
 
-      @if (roundHistory().length > 0) {
-        <div class="form-group">
-          <label>Rounds Played</label>
+      <div class="form-group" [class.mobile-hidden-when-summary]="addRoundFormOpen()">
+        @if (roundHistory().length > 0) {
+          <label class="scoreboard-label">Rounds Played</label>
           <div class="rounds-list rounds-list--compact">
             @for (entry of roundHistory(); track entry.round_id) {
               <div class="round-row" [class.round-row--editing]="editingRoundId() === entry.round_id">
@@ -403,27 +445,53 @@
               </div>
             }
           </div>
-        </div>
-      }
+        }
+      </div>
     </div>
     <div class="dialog-footer rounds-dialog-footer">
       <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound()">
         @if (isSubmittingRound()) {
           Submitting...
         } @else if (editingRoundId()) {
-          Update Round
+          Update Round {{ activeRoundNumber() }}
         } @else {
-          Submit Round
+          Submit Round {{ activeRoundNumber() }}
         }
       </button>
       @if (editingRoundId()) {
-        <button class="btn btn-secondary btn-subtle" (click)="cancelEditRound()">Cancel Edit</button>
+        <button class="btn btn-secondary btn-subtle" (click)="cancelEditRound()">Cancel</button>
       } @else {
+        @if (addRoundFormOpen()) {
+          <button class="btn btn-secondary btn-subtle" (click)="cancelAddRound()">Cancel</button>
+        }
         <button class="btn btn-success btn-subtle" (click)="finishGame()">Finish Game</button>
       }
     </div>
     <div class="dialog-danger-zone">
       <button class="btn-link-danger" (click)="deleteCurrentGame()">Delete Game</button>
+    </div>
+
+    <div class="mobile-fab-container">
+      @if (roundActionsMenuOpen()) {
+        <div class="mobile-fab-menu">
+          @if (!editingRoundId()) {
+            <button class="mobile-fab-option mobile-fab-option--success" (click)="roundActionsMenuOpen.set(false); finishGame()">Finish Game</button>
+          }
+          <button class="mobile-fab-option mobile-fab-option--danger" (click)="roundActionsMenuOpen.set(false); deleteCurrentGame()">Delete Game</button>
+        </div>
+      }
+      <button
+        class="mobile-fab"
+        [class.mobile-fab--open]="roundActionsMenuOpen()"
+        (click)="toggleRoundActionsMenu()"
+        aria-label="Round actions"
+      >
+        @if (roundActionsMenuOpen()) {
+          ✕
+        } @else {
+          ⋮
+        }
+      </button>
     </div>
   }
 </dialog>
