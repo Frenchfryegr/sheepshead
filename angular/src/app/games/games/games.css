@@ -808,6 +808,48 @@
   color: #ffffff;
 }
 
+.score-table th.initials-header {
+  position: relative;
+  cursor: pointer;
+}
+
+.initials-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  background: #111827;
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 20;
+}
+
+.initials-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: #111827;
+}
+
+.score-table th.initials-header:hover .initials-tooltip,
+.score-table th.initials-header.tooltip-open .initials-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
 .score-table td.winner-cell {
   background: #d1fae5;
   color: #065f46;
