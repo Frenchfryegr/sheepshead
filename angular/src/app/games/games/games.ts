@@ -18,6 +18,8 @@ interface RoundHistoryEntry {
 interface ScoreTableRow {
   round_number: number
   totals: Map<number, number>
+  pickerId: number | null
+  partnerId: number | null
 }
 
 interface ScoreTable {
@@ -264,6 +266,7 @@ export class Games {
     }).subscribe(game => {
       this.newGameId.set(game.game_id)
       this.step.set('rounds')
+      this.resetRoundForm()
     })
   }
 
@@ -452,7 +455,7 @@ export class Games {
   onPickerChange(playerId: number | null) {
     this.roundPickerPlayerId.set(playerId)
     this.roundPartnerPlayerId.set(null)
-    this.roundNoPartner.set(false)
+    this.roundNoPartner.set(this.defaultNoPartner())
   }
 
   onPartnerChange(value: number | null) {
@@ -490,8 +493,16 @@ export class Games {
     return 'role--' + role.replace(/\s+/g, '_')
   }
 
+  absScore(value: number | undefined): number {
+    return Math.abs(value ?? 0)
+  }
+
   getSelectedGamePlayers(): Player[] {
     return this.selectedGame?.Players_X_Games.map(pxg => pxg.Players) ?? []
+  }
+
+  getSelectedGameRounds(): Round[] {
+    return [...(this.selectedGame?.Rounds ?? [])].sort((a, b) => a.round_number - b.round_number)
   }
 
   selectedGameScoreTable(): ScoreTable {
@@ -517,10 +528,14 @@ export class Games {
     this.roundPartnerPlayerId.set(null)
     this.roundResult.set('')
     this.roundNoSchneider.set(false)
-    this.roundNoPartner.set(false)
+    this.roundNoPartner.set(this.defaultNoPartner())
     this.roundNoTrick.set(false)
     this.editingRoundId.set(null)
     this.isSubmittingRound.set(false)
+  }
+
+  private defaultNoPartner(): boolean {
+    return this.newGamePlayers().length === 5
   }
 
   private buildScoreTable(players: Player[], roundsData: RoundHistoryEntry[], highlightWinner = false): ScoreTable {
@@ -531,7 +546,9 @@ export class Games {
       for (const score of round.scores) {
         runningTotals.set(score.player_id, (runningTotals.get(score.player_id) ?? 0) + score.point_delta)
       }
-      return { round_number: round.round_number, totals: new Map(runningTotals) }
+      const pickerId = round.scores.find(s => s.player_role === 'Picker')?.player_id ?? null
+      const partnerId = round.scores.find(s => s.player_role === 'Partner')?.player_id ?? null
+      return { round_number: round.round_number, totals: new Map(runningTotals), pickerId, partnerId }
     })
 
     const lastRow = rows[rows.length - 1]
