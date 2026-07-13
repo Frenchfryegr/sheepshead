@@ -90,6 +90,7 @@ export class Games implements AfterViewInit {
   playerSearchQuery = signal('')
   showPlayerDropdown = signal(false)
   newGameId = signal<number | null>(null)
+  newGameDatetime = signal<string | null>(null)
   currentRoundNumber = signal(1)
   roundPickerPlayerId = signal<number | null>(null)
   roundPartnerPlayerId = signal<number | null>(null)
@@ -101,6 +102,7 @@ export class Games implements AfterViewInit {
   roundHistory = signal<RoundHistoryEntry[]>([])
   editingRoundId = signal<number | null>(null)
   roundActionsMenuOpen = signal(false)
+  addRoundFormOpen = signal(false)
 
   isLeasterRound = computed(() => this.roundResult() === 'Leaster')
   showPartnerSelect = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
@@ -108,6 +110,13 @@ export class Games implements AfterViewInit {
 
   roundPlayerScores = computed(() => this.calculatePlayerScores())
   activeScoreTable = computed(() => this.buildScoreTable(this.newGamePlayers(), this.roundHistory()))
+  activeRoundNumber = computed(() => {
+    const editingId = this.editingRoundId()
+    if (editingId) {
+      return this.roundHistory().find(entry => entry.round_id === editingId)?.round_number ?? this.currentRoundNumber()
+    }
+    return this.currentRoundNumber()
+  })
 
   constructor() {
     this.refreshGames()
@@ -214,6 +223,7 @@ export class Games implements AfterViewInit {
 
     this.newGamePlayers.set(players)
     this.newGameId.set(game.game_id)
+    this.newGameDatetime.set(game.game_datetime)
     this.refreshWizardRoundState(game)
     this.resetRoundForm()
     this.step.set('rounds')
@@ -235,6 +245,7 @@ export class Games implements AfterViewInit {
     this.playerSearchQuery.set('')
     this.showPlayerDropdown.set(false)
     this.newGameId.set(null)
+    this.newGameDatetime.set(null)
     this.currentRoundNumber.set(1)
     this.roundHistory.set([])
     this.resetRoundForm()
@@ -292,6 +303,7 @@ export class Games implements AfterViewInit {
       player_ids: players.map(p => p.player_id)
     }).subscribe(game => {
       this.newGameId.set(game.game_id)
+      this.newGameDatetime.set(game.game_datetime)
       this.step.set('rounds')
       this.resetRoundForm()
     })
@@ -425,9 +437,14 @@ export class Games implements AfterViewInit {
     this.roundNoPartner.set(entry.no_partner)
     this.roundNoTrick.set(entry.no_trick)
     this.editingRoundId.set(entry.round_id)
+    this.addRoundFormOpen.set(true)
   }
 
   cancelEditRound() {
+    this.resetRoundForm()
+  }
+
+  cancelAddRound() {
     this.resetRoundForm()
   }
 
@@ -570,6 +587,7 @@ export class Games implements AfterViewInit {
     this.roundNoTrick.set(false)
     this.editingRoundId.set(null)
     this.isSubmittingRound.set(false)
+    this.addRoundFormOpen.set(false)
   }
 
   private defaultNoPartner(): boolean {
