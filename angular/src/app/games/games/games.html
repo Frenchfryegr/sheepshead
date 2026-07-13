@@ -14,6 +14,31 @@
         {{ sortDirection() === 'asc' ? '▲ Oldest First' : '▼ Newest First' }}
       </button>
     </div>
+    <div class="game-tiles">
+      @for (game of sortedGames(); track game.game_id) {
+        <div class="game-tile" (click)="selectGame(game)">
+          <div class="game-tile__col">
+            <div class="game-tile__cell game-tile__date">{{ formatGameDateTime(game.game_datetime) }}</div>
+            <div class="game-tile__cell game-tile__hand">{{ game.num_players }}-hand</div>
+            <div class="game-tile__cell game-tile__rounds">{{ game.Rounds.length }} Rounds Played</div>
+          </div>
+          <div class="game-tile__col">
+            <div class="game-tile__cell game-tile__highlight">
+              <span class="game-tile__label">{{ game.is_completed ? 'Winner' : 'Winning' }}</span>
+              <span class="game-tile__value">{{ getGameWinnerName(game) }}</span>
+            </div>
+            <div class="game-tile__cell game-tile__highlight">
+              <span class="game-tile__label">Status</span>
+              @if (game.is_completed) {
+                <span class="badge badge-completed badge-toggle" (click)="toggleGameStatus(game, $event)">Completed</span>
+              } @else {
+                <span class="badge badge-in-progress badge-toggle" (click)="toggleGameStatus(game, $event)">In Progress</span>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
     <div class="table-wrapper">
       <table class="games-table">
         <thead>
@@ -53,17 +78,17 @@
         <tbody>
           @for (game of sortedGames(); track game.game_id) {
             <tr class="game-row" (click)="selectGame(game)">
-              <td data-label="Date">{{ game.game_datetime | date:'short' }}</td>
-              <td data-label="Players">{{ game.num_players }}</td>
-              <td data-label="Rounds">{{ game.Rounds.length }}</td>
-              <td data-label="Status">
+              <td>{{ game.game_datetime | date:'short' }}</td>
+              <td>{{ game.num_players }}</td>
+              <td>{{ game.Rounds.length }}</td>
+              <td>
                 @if (game.is_completed) {
                   <span class="badge badge-completed badge-toggle" (click)="toggleGameStatus(game, $event)">Completed</span>
                 } @else {
                   <span class="badge badge-in-progress badge-toggle" (click)="toggleGameStatus(game, $event)">In Progress</span>
                 }
               </td>
-              <td [attr.data-label]="game.is_completed ? 'Winner' : 'Winning'">{{ getGameWinnerName(game) }}</td>
+              <td>{{ getGameWinnerName(game) }}</td>
             </tr>
           }
         </tbody>
@@ -297,10 +322,12 @@
             @for (score of roundPlayerScores(); track score.player_id) {
               <div class="score-row">
                 <span class="score-player">{{ getPlayerName(score.player_id) }}</span>
-                <span class="score-role" [class]="roleClass(score.player_role)">{{ score.player_role }}</span>
-                <span class="score-delta" [class.delta-positive]="score.point_delta >= 0" [class.delta-negative]="score.point_delta < 0">
-                  {{ score.point_delta >= 0 ? '+' : '' }}{{ score.point_delta }}
-                </span>
+                <div class="score-row__result">
+                  <span class="score-role" [class]="roleClass(score.player_role)">{{ score.player_role }}</span>
+                  <span class="score-delta" [class.delta-positive]="score.point_delta >= 0" [class.delta-negative]="score.point_delta < 0">
+                    {{ score.point_delta >= 0 ? '+' : '' }}{{ score.point_delta }}
+                  </span>
+                </div>
               </div>
             }
           </div>
