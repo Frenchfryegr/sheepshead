@@ -100,6 +100,7 @@ export class Games implements AfterViewInit {
   isSubmittingRound = signal(false)
   roundHistory = signal<RoundHistoryEntry[]>([])
   editingRoundId = signal<number | null>(null)
+  roundActionsMenuOpen = signal(false)
 
   isLeasterRound = computed(() => this.roundResult() === 'Leaster')
   showPartnerSelect = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
@@ -457,6 +458,11 @@ export class Games implements AfterViewInit {
     this.refreshGames()
     this.gameWizardDialog.nativeElement.close()
     this.step.set('idle')
+    this.roundActionsMenuOpen.set(false)
+  }
+
+  toggleRoundActionsMenu() {
+    this.roundActionsMenuOpen.set(!this.roundActionsMenuOpen())
   }
 
   onGameRoundsBackdropClick(event: MouseEvent) {
