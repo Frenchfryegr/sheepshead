@@ -179,7 +179,7 @@
 .dialog-danger-zone {
   display: flex;
   justify-content: center;
-  padding: 4px 24px 16px;
+  padding: 0 24px 10px;
   flex-shrink: 0;
 }
 
@@ -276,6 +276,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  padding-bottom: 8px;
 }
 
 .rounds-dialog-footer .btn-primary {
@@ -301,7 +302,7 @@
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .form-group label {
@@ -431,8 +432,8 @@
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 6px;
+  padding: 4px 5px;
   background: #f9fafb;
   border-radius: 8px;
 }
@@ -441,7 +442,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 0;
+  padding: 4px 0;
   font-size: 0.95rem;
   color: #374151;
   cursor: pointer;
@@ -452,10 +453,6 @@
   height: 18px;
   accent-color: #667eea;
   cursor: pointer;
-}
-
-.checkbox-label--nested {
-  margin-left: 28px;
 }
 
 .rounds-list {
@@ -776,6 +773,12 @@
 
   .round-row {
     flex-wrap: wrap;
+    padding: 4px 10px;
+    gap: 6px;
+  }
+
+  .round-row .btn-icon {
+    min-height: 32px;
   }
 
   .btn {
@@ -872,6 +875,7 @@
   }
 
   .dialog-body {
+    padding-top: max(15px, env(safe-area-inset-top, 0px));
     padding-left: max(24px, env(safe-area-inset-left, 0px));
     padding-right: max(24px, env(safe-area-inset-right, 0px));
   }
@@ -888,7 +892,7 @@
   }
 
   .dialog-danger-zone {
-    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
   }
 
   .dialog-footer.rounds-dialog-footer {
