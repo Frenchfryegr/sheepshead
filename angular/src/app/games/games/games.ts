@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { AfterViewInit, Component, computed, HostListener, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { DatePipe, formatDate } from '@angular/common';
 import { GamesService } from '../games-service';
 import { Game } from '../../interfaces/game';
@@ -611,8 +611,9 @@ export class Games implements AfterViewInit {
   }
 
   private buildScoreTable(players: Player[], roundsData: RoundHistoryEntry[], highlightWinner = false): ScoreTable {
+    const sortedPlayers = this.sortPlayersByInitials(players)
     const sortedRounds = [...roundsData].sort((a, b) => a.round_number - b.round_number)
-    const runningTotals = new Map<number, number>(players.map(p => [p.player_id, 0]))
+    const runningTotals = new Map<number, number>(sortedPlayers.map(p => [p.player_id, 0]))
 
     const rows: ScoreTableRow[] = sortedRounds.map(round => {
       for (const score of round.scores) {
@@ -632,7 +633,26 @@ export class Games implements AfterViewInit {
       }
     }
 
-    return { players, initials: this.computePlayerInitials(players), rows, winnerIds }
+    return { players: sortedPlayers, initials: this.computePlayerInitials(sortedPlayers), rows, winnerIds }
+  }
+
+  activeInitialsTooltip = signal<number | null>(null)
+
+  toggleInitialsTooltip(playerId: number, event: Event): void {
+    event.stopPropagation()
+    this.activeInitialsTooltip.set(this.activeInitialsTooltip() === playerId ? null : playerId)
+  }
+
+  @HostListener('document:click')
+  closeInitialsTooltip(): void {
+    this.activeInitialsTooltip.set(null)
+  }
+
+  private sortPlayersByInitials(players: Player[]): Player[] {
+    return [...players].sort((a, b) => {
+      const initialsCompare = this.getBaseInitials(a.player_name).localeCompare(this.getBaseInitials(b.player_name))
+      return initialsCompare !== 0 ? initialsCompare : a.player_name.localeCompare(b.player_name)
+    })
   }
 
   private computePlayerInitials(players: Player[]): Map<number, string> {

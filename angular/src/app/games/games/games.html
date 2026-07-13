@@ -106,14 +106,22 @@
     @if (selectedGame) {
       @if (selectedGameScoreTable().rows.length > 0) {
         <div class="form-group">
-          <label>Game Results</label>
+          <label class="scoreboard-label">Scoreboard</label>
           <div class="table-wrapper">
             <table class="score-table">
               <thead>
                 <tr>
                   <th>Round</th>
                   @for (player of selectedGameScoreTable().players; track player.player_id) {
-                    <th [class.winner-cell]="selectedGameScoreTable().winnerIds.has(player.player_id)">{{ selectedGameScoreTable().initials.get(player.player_id) }}</th>
+                    <th
+                      class="initials-header"
+                      [class.winner-cell]="selectedGameScoreTable().winnerIds.has(player.player_id)"
+                      [class.tooltip-open]="activeInitialsTooltip() === player.player_id"
+                      (click)="toggleInitialsTooltip(player.player_id, $event)"
+                    >
+                      {{ selectedGameScoreTable().initials.get(player.player_id) }}
+                      <span class="initials-tooltip">{{ player.player_name }}</span>
+                    </th>
                   }
                 </tr>
               </thead>
@@ -284,7 +292,9 @@
           <span class="dialog-header__date">{{ formatGameDateTime(newGameDatetime()!) }}</span>
         }
       </div>
-      <button class="btn-close" (click)="closeWizard()">&times;</button>
+      @if (!addRoundFormOpen()) {
+        <button class="btn-close" (click)="closeWizard()">&times;</button>
+      }
     </div>
     <div class="dialog-body">
       @if (!addRoundFormOpen()) {
@@ -406,7 +416,15 @@
                 <tr>
                   <th>Round</th>
                   @for (player of activeScoreTable().players; track player.player_id) {
-                    <th [class.winner-cell]="activeScoreTable().winnerIds.has(player.player_id)">{{ activeScoreTable().initials.get(player.player_id) }}</th>
+                    <th
+                      class="initials-header"
+                      [class.winner-cell]="activeScoreTable().winnerIds.has(player.player_id)"
+                      [class.tooltip-open]="activeInitialsTooltip() === player.player_id"
+                      (click)="toggleInitialsTooltip(player.player_id, $event)"
+                    >
+                      {{ activeScoreTable().initials.get(player.player_id) }}
+                      <span class="initials-tooltip">{{ player.player_name }}</span>
+                    </th>
                   }
                 </tr>
               </thead>
