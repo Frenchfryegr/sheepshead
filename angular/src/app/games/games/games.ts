@@ -102,6 +102,7 @@ export class Games implements AfterViewInit {
   roundHistory = signal<RoundHistoryEntry[]>([])
   editingRoundId = signal<number | null>(null)
   roundActionsMenuOpen = signal(false)
+  completedActionsMenuOpen = signal(false)
   addRoundFormOpen = signal(false)
 
   isLeasterRound = computed(() => this.roundResult() === 'Leaster')
@@ -192,6 +193,7 @@ export class Games implements AfterViewInit {
     if (!gameId) return
     this.confirmAndDeleteGame(gameId, () => {
       this.showGameRoundsDialog.nativeElement.close()
+      this.completedActionsMenuOpen.set(false)
       this.selectedGame = null
       this.refreshGames()
     })
@@ -484,7 +486,16 @@ export class Games implements AfterViewInit {
 
   onGameRoundsBackdropClick(event: MouseEvent) {
     if (event.target !== event.currentTarget) return
+    this.closeGameRoundsDialog()
+  }
+
+  closeGameRoundsDialog() {
     this.showGameRoundsDialog.nativeElement.close()
+    this.completedActionsMenuOpen.set(false)
+  }
+
+  toggleCompletedActionsMenu() {
+    this.completedActionsMenuOpen.set(!this.completedActionsMenuOpen())
   }
 
   scrollFieldIntoView(event: FocusEvent) {

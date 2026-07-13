@@ -97,10 +97,10 @@
   }
 </div>
 
-<dialog #ShowGameRounds class="dialog" (click)="onGameRoundsBackdropClick($event)">
+<dialog #ShowGameRounds class="dialog dialog-completed" (click)="onGameRoundsBackdropClick($event)">
   <div class="dialog-header">
     <h2>Game #{{ selectedGame?.game_id }}</h2>
-    <button class="btn-close" (click)="showGameRoundsDialog.nativeElement.close()">&times;</button>
+    <button class="btn-close" (click)="closeGameRoundsDialog()">&times;</button>
   </div>
   <div class="dialog-body">
     @if (selectedGame) {
@@ -169,6 +169,26 @@
   </div>
   <div class="dialog-danger-zone">
     <button class="btn-link-danger" (click)="deleteSelectedGame()">Delete Game</button>
+  </div>
+
+  <div class="mobile-fab-container">
+    @if (completedActionsMenuOpen()) {
+      <div class="mobile-fab-menu">
+        <button class="mobile-fab-option mobile-fab-option--danger" (click)="completedActionsMenuOpen.set(false); deleteSelectedGame()">Delete Game</button>
+      </div>
+    }
+    <button
+      class="mobile-fab"
+      [class.mobile-fab--open]="completedActionsMenuOpen()"
+      (click)="toggleCompletedActionsMenu()"
+      aria-label="Game actions"
+    >
+      @if (completedActionsMenuOpen()) {
+        ✕
+      } @else {
+        ⋮
+      }
+    </button>
   </div>
 </dialog>
 
