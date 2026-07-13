@@ -316,7 +316,7 @@
               <div class="form-group">
                 <label>Picker</label>
                 <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
-                  <option [ngValue]="null" disabled>Select player</option>
+                  <option [ngValue]="null" disabled>Select picker</option>
                   @for (player of newGamePlayers(); track player.player_id) {
                     <option [ngValue]="player.player_id">{{ player.player_name }}</option>
                   }
@@ -327,6 +327,7 @@
                 <div class="form-group">
                   <label>Partner</label>
                   <select class="input" [ngModel]="partnerSelectValue()" (ngModelChange)="onPartnerChange($event)">
+                    <option [ngValue]="null" disabled>Select partner</option>
                     <option [ngValue]="-1">No Partner</option>
                     @for (player of newGamePlayers(); track player.player_id) {
                       @if (player.player_id !== roundPickerPlayerId()) {
