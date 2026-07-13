@@ -148,7 +148,7 @@ export class Games implements AfterViewInit {
   private compareGames(a: Game, b: Game, column: GameSortColumn): number {
     switch (column) {
       case 'game_datetime':
-        return new Date(a.game_datetime).getTime() - new Date(b.game_datetime).getTime()
+        return new Date(this.normalizeDatetime(a.game_datetime)).getTime() - new Date(this.normalizeDatetime(b.game_datetime)).getTime()
       case 'num_players':
         return a.num_players - b.num_players
       case 'rounds':
@@ -558,9 +558,14 @@ export class Games implements AfterViewInit {
   }
 
   formatGameDateTime(isoDateTime: string): string {
-    const datePart = formatDate(isoDateTime, 'EEE MMM d, y', 'en-US')
-    const timePart = formatDate(isoDateTime, 'h:mm a', 'en-US').replace(' ', '').toLowerCase()
+    const normalized = this.normalizeDatetime(isoDateTime)
+    const datePart = formatDate(normalized, 'EEE MMM d, y', 'en-US')
+    const timePart = formatDate(normalized, 'h:mm a', 'en-US').replace(' ', '').toLowerCase()
     return `${datePart}: ${timePart}`
+  }
+
+  normalizeDatetime(isoDateTime: string): string {
+    return /Z$|[+-]\d{2}:\d{2}$/.test(isoDateTime) ? isoDateTime : isoDateTime + 'Z'
   }
 
   getSelectedGamePlayers(): Player[] {

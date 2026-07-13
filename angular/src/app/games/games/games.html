@@ -78,7 +78,7 @@
         <tbody>
           @for (game of sortedGames(); track game.game_id) {
             <tr class="game-row" (click)="selectGame(game)">
-              <td>{{ game.game_datetime | date:'short' }}</td>
+              <td>{{ normalizeDatetime(game.game_datetime) | date:'short' }}</td>
               <td>{{ game.num_players }}</td>
               <td>{{ game.Rounds.length }}</td>
               <td>
