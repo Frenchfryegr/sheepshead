@@ -382,7 +382,7 @@ export class Games implements AfterViewInit {
     const scores = this.roundPlayerScores()
     const editingId = this.editingRoundId()
     const noSchneider = this.roundNoSchneider()
-    const noPartner = this.roundNoPartner()
+    const noPartner = result === 'Leaster' ? false : this.roundNoPartner()
     const noTrick = this.roundNoTrick()
 
     this.isSubmittingRound.set(true)
