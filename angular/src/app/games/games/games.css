@@ -966,7 +966,7 @@
   }
 
   .dialog-body {
-    padding-top: max(15px, env(safe-area-inset-top, 0px));
+    padding-top: 15px;
     padding-left: max(24px, env(safe-area-inset-left, 0px));
     padding-right: max(24px, env(safe-area-inset-right, 0px));
   }
