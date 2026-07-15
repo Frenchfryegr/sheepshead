@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, computed, HostListener, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { DatePipe, formatDate } from '@angular/common';
 import { GamesService } from '../games-service';
+import { AuthService } from '../../auth/auth-service';
 import { Game } from '../../interfaces/game';
 import { Player } from '../../interfaces/player';
 import { PlayerRoundScore, PlayerRole, Round } from '../../interfaces/round';
@@ -40,6 +41,7 @@ type SortDirection = 'asc' | 'desc'
 })
 export class Games implements AfterViewInit {
   private gamesService = inject(GamesService)
+  protected authService = inject(AuthService)
   private gamesSignal = signal<Game[]>([])
   games = this.gamesSignal.asReadonly()
 
@@ -201,6 +203,7 @@ export class Games implements AfterViewInit {
 
   toggleGameStatus(game: Game, event: Event) {
     event.stopPropagation()
+    if (!this.authService.isAuthenticated()) return
     this.gamesService.setGameStatus(game.game_id, !game.is_completed).subscribe(() => {
       this.refreshGames()
     })
