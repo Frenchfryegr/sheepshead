@@ -1,0 +1,94 @@
+<div class="account-bar">
+  @if (authService.isAuthenticated()) {
+    <span class="account-bar__username">{{ authService.username() }}</span>
+    @if (authService.claimedPlayerId()) {
+      <button class="account-bar__link" (click)="openClaimDialog()">Playing as: {{ claimedPlayerName() }}</button>
+    } @else {
+      <button class="account-bar__link" (click)="openClaimDialog()">Claim a player</button>
+    }
+    <button class="account-bar__link" (click)="logout()">Log Out</button>
+  } @else {
+    <button class="account-bar__link" (click)="openAuthDialog('login')">Log In</button>
+    <button class="btn btn-primary account-bar__signup-btn" (click)="openAuthDialog('signup')">Sign Up</button>
+  }
+</div>
+
+<dialog #AuthDialog class="dialog" (click)="onBackdropClick($event)">
+  <div class="dialog-header">
+    <h2>{{ mode() === 'login' ? 'Log In' : 'Sign Up' }}</h2>
+    <button class="btn-close" (click)="closeDialog()">&times;</button>
+  </div>
+  <div class="dialog-body">
+    @if (errorMessage()) {
+      <p class="account-bar__error">{{ errorMessage() }}</p>
+    }
+    <div class="form-group">
+      <label>Username</label>
+      <input class="input" type="text" autocomplete="username" [ngModel]="usernameInput()" (ngModelChange)="usernameInput.set($event)" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input class="input" type="password" autocomplete="current-password" [ngModel]="passwordInput()" (ngModelChange)="passwordInput.set($event)" (keyup.enter)="submit()" />
+    </div>
+    @if (mode() === 'signup') {
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input class="input" type="password" autocomplete="new-password" [ngModel]="confirmPasswordInput()" (ngModelChange)="confirmPasswordInput.set($event)" />
+      </div>
+      <div class="form-group">
+        <label>Invite Code</label>
+        <input class="input" type="text" [ngModel]="inviteCodeInput()" (ngModelChange)="inviteCodeInput.set($event)" (keyup.enter)="submit()" />
+      </div>
+      <div class="form-group">
+        <label>Email <span class="account-bar__optional">(optional)</span></label>
+        <input class="input" type="email" autocomplete="email" [ngModel]="emailInput()" (ngModelChange)="emailInput.set($event)" (keyup.enter)="submit()" />
+      </div>
+    }
+  </div>
+  <div class="dialog-footer">
+    <button class="btn btn-primary" (click)="submit()" [disabled]="isSubmitting()">
+      @if (isSubmitting()) {
+        Please wait...
+      } @else if (mode() === 'login') {
+        Log In
+      } @else {
+        Sign Up
+      }
+    </button>
+  </div>
+  <p class="account-bar__toggle">
+    @if (mode() === 'login') {
+      Don't have an account? <a (click)="switchMode('signup')">Sign up</a>
+    } @else {
+      Already have an account? <a (click)="switchMode('login')">Log in</a>
+    }
+  </p>
+</dialog>
+
+<dialog #ClaimDialog class="dialog" (click)="onClaimBackdropClick($event)">
+  <div class="dialog-header">
+    <h2>Claim a Player</h2>
+    <button class="btn-close" (click)="closeClaimDialog()">&times;</button>
+  </div>
+  <div class="dialog-body">
+    @if (claimError()) {
+      <p class="account-bar__error">{{ claimError() }}</p>
+    }
+    @if (players().length === 0) {
+      <p class="text-muted">No players yet.</p>
+    } @else {
+      <div class="account-bar__player-list">
+        @for (player of players(); track player.player_id) {
+          <div class="account-bar__player-row">
+            <span>{{ player.player_name }}</span>
+            @if (authService.claimedPlayerId() === player.player_id) {
+              <button class="btn btn-secondary account-bar__player-btn" (click)="unclaim(player.player_id)">Unclaim</button>
+            } @else {
+              <button class="btn btn-primary account-bar__player-btn" (click)="claim(player.player_id)" [disabled]="!!authService.claimedPlayerId()">Claim</button>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+</dialog>
