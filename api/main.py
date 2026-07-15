@@ -142,6 +142,17 @@ def set_game_status(game_id, is_completed: bool = Body(..., embed=True), user_id
     )
     return response.data[0]
 
+@app.patch("/games/{game_id}/name", tags=["Game Management"])
+def set_game_name(game_id, game_name: str | None = Body(None, embed=True), user_id: str = Depends(get_current_user_id)):
+    normalized_name = game_name.strip() if game_name else None
+    response = (
+        supabase.table(TABLE_NAMES.GAMES.value)
+        .update({"game_name": normalized_name or None})
+        .eq("game_id", game_id)
+        .execute()
+    )
+    return response.data[0]
+
 @app.patch("/games/{game_id}/complete", tags=["Game Management"])
 def complete_game(game_id, user_id: str = Depends(get_current_user_id)):
     response = (

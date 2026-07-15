@@ -263,8 +263,9 @@
 
 .dialog-header__title {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -277,6 +278,37 @@
 
 .dialog-wizard .dialog-header h2 {
   font-size: 1.6rem;
+}
+
+.game-name-editable {
+  cursor: pointer;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.game-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-name-input {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  font-family: inherit;
+  border: 1.5px solid #667eea;
+  border-radius: 6px;
+  padding: 2px 8px;
+  min-width: 0;
+  max-width: 100%;
+  touch-action: manipulation;
+}
+
+.game-name-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .btn-add-round {
@@ -1012,6 +1044,25 @@
 
   .game-tile__date {
     font-weight: 700;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .game-tile__name {
+    font-weight: 700;
+    color: #1a1a2e;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .game-tile__date-sub {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #9ca3af;
   }
 
   .game-tile__hand,

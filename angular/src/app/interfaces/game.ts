@@ -7,6 +7,7 @@ export interface Game {
     num_players: number
     game_datetime: string
     is_completed: boolean
+    game_name: string | null
     Rounds: Round[]
     Players_X_Games: { Players: Player }[]
 }
