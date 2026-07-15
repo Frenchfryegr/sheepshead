@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, computed, ElementRef, inject, signal, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, inject, signal, ViewChild } from '@angular/core';
 
 import { AuthService } from '../auth-service';
 import { GamesService } from '../../games/games-service';
@@ -36,12 +36,6 @@ export class AccountBar implements AfterViewInit {
 
   players = signal<Player[]>([])
   claimError = signal<string | null>(null)
-
-  claimedPlayerName = computed(() => {
-    const id = this.authService.claimedPlayerId()
-    if (!id) return null
-    return this.players().find(p => p.player_id === id)?.player_name ?? null
-  })
 
   openAuthDialog(mode: AuthMode) {
     this.mode.set(mode)

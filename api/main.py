@@ -382,13 +382,14 @@ def signup(username: str = Body(...), password: str = Body(...), invite_code: st
         "expires_at": session.expires_at,
         "username": account["username"],
         "claimed_player_id": account["claimed_player_id"],
+        "claimed_player_name": None,
     }
 
 @app.post("/auth/login", tags=["Auth"])
 def login(username: str = Body(...), password: str = Body(...)):
     account_lookup = (
         supabase.table(TABLE_NAMES.ACCOUNTS.value)
-        .select("*")
+        .select(f"*, {TABLE_NAMES.PLAYERS.value}(player_name)")
         .ilike("username", username.strip())
         .execute()
     )
@@ -408,12 +409,14 @@ def login(username: str = Body(...), password: str = Body(...)):
     if not session:
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
+    claimed_player = account.get(TABLE_NAMES.PLAYERS.value)
     return {
         "access_token": session.access_token,
         "refresh_token": session.refresh_token,
         "expires_at": session.expires_at,
         "username": account["username"],
         "claimed_player_id": account["claimed_player_id"],
+        "claimed_player_name": claimed_player["player_name"] if claimed_player else None,
     }
 
 @app.post("/auth/refresh", tags=["Auth"])

@@ -4,6 +4,7 @@ export interface AuthSession {
     expires_at: number
     username: string
     claimed_player_id: number | null
+    claimed_player_name: string | null
 }
 
 export interface RefreshedTokens {

@@ -24,6 +24,7 @@ export class TokenStore {
   expiresAt = signal<number | null>(null)
   username = signal<string | null>(null)
   claimedPlayerId = signal<number | null>(null)
+  claimedPlayerName = signal<string | null>(null)
 
   isAuthenticated = computed(() => !!this.accessToken())
 
@@ -42,9 +43,10 @@ export class TokenStore {
     }
   }
 
-  setAccountInfo(username: string, claimedPlayerId: number | null) {
+  setAccountInfo(username: string, claimedPlayerId: number | null, claimedPlayerName: string | null) {
     this.username.set(username)
     this.claimedPlayerId.set(claimedPlayerId)
+    this.claimedPlayerName.set(claimedPlayerName)
   }
 
   clear() {
@@ -53,6 +55,7 @@ export class TokenStore {
     this.expiresAt.set(null)
     this.username.set(null)
     this.claimedPlayerId.set(null)
+    this.claimedPlayerName.set(null)
     if (this.isBrowser) {
       localStorage.removeItem(STORAGE_KEY)
     }
