@@ -21,6 +21,7 @@ interface ScoreTableRow {
   totals: Map<number, number>
   pickerId: number | null
   partnerId: number | null
+  dealerId: number | null
 }
 
 interface ScoreTable {
@@ -100,6 +101,7 @@ export class Games implements AfterViewInit {
   roundNoSchneider = signal(false)
   roundNoPartner = signal(false)
   roundNoTrick = signal(false)
+  roundDealerPlayerId = signal<number | null>(null)
   isSubmittingRound = signal(false)
   roundHistory = signal<RoundHistoryEntry[]>([])
   editingRoundId = signal<number | null>(null)
@@ -110,6 +112,14 @@ export class Games implements AfterViewInit {
   isLeasterRound = computed(() => this.roundResult() === 'Leaster')
   showPartnerSelect = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
   partnerSelectValue = computed(() => this.roundNoPartner() ? -1 : this.roundPartnerPlayerId())
+  isDealerGame = computed(() => this.newGamePlayers().length === 4)
+  isValidPlayerCount = computed(() => [3, 4, 5].includes(this.newGamePlayers().length))
+  activeRoundPlayers = computed(() => {
+    const players = this.newGamePlayers()
+    if (!this.isDealerGame()) return players
+    const dealerId = this.roundDealerPlayerId()
+    return dealerId ? players.filter(p => p.player_id !== dealerId) : []
+  })
 
   roundPlayerScores = computed(() => this.calculatePlayerScores())
   activeScoreTable = computed(() => this.buildScoreTable(this.newGamePlayers(), this.roundHistory()))
@@ -302,7 +312,7 @@ export class Games implements AfterViewInit {
 
   submitGame() {
     const players = this.newGamePlayers()
-    if (players.length !== 3 && players.length !== 5) return
+    if (!this.isValidPlayerCount()) return
     this.gamesService.createGame({
       num_players: players.length,
       player_ids: players.map(p => p.player_id)
@@ -315,7 +325,10 @@ export class Games implements AfterViewInit {
   }
 
   calculatePlayerScores(): PlayerRoundScore[] {
-    const players = this.newGamePlayers()
+    const allPlayers = this.newGamePlayers()
+    const dealerId = this.isDealerGame() ? this.roundDealerPlayerId() : null
+    if (this.isDealerGame() && !dealerId) return []
+    const players = dealerId ? allPlayers.filter(p => p.player_id !== dealerId) : allPlayers
     const pickerId = this.roundPickerPlayerId()
     const partnerId = this.roundPartnerPlayerId()
     const result = this.roundResult()
@@ -337,7 +350,7 @@ export class Games implements AfterViewInit {
       else if (this.roundNoSchneider()) multiplier = 2
     }
 
-    return players.map(player => {
+    const scores: PlayerRoundScore[] = players.map(player => {
       let role: PlayerRole
       let delta: number
 
@@ -374,6 +387,9 @@ export class Games implements AfterViewInit {
 
       return { player_id: player.player_id, player_role: role, point_delta: delta }
     })
+
+    if (dealerId) scores.push({ player_id: dealerId, player_role: 'Dealer', point_delta: 0 })
+    return scores
   }
 
   submitRound() {
@@ -381,6 +397,7 @@ export class Games implements AfterViewInit {
     const pickerId = this.roundPickerPlayerId()
     const result = this.roundResult()
     if (!gameId || !pickerId || !result) return
+    if (this.isDealerGame() && !this.roundDealerPlayerId()) return
 
     const scores = this.roundPlayerScores()
     const editingId = this.editingRoundId()
@@ -434,7 +451,9 @@ export class Games implements AfterViewInit {
     const isLeaster = entry.round_result === 'Leaster'
     const pickerScore = entry.scores.find(s => s.player_role === (isLeaster ? 'Leaster Winner' : 'Picker'))
     const partnerScore = entry.scores.find(s => s.player_role === 'Partner')
+    const dealerScore = entry.scores.find(s => s.player_role === 'Dealer')
 
+    this.roundDealerPlayerId.set(dealerScore?.player_id ?? null)
     this.roundPickerPlayerId.set(pickerScore?.player_id ?? null)
     this.roundPartnerPlayerId.set(partnerScore?.player_id ?? null)
     this.roundResult.set(entry.round_result)
@@ -521,6 +540,15 @@ export class Games implements AfterViewInit {
     this.roundNoPartner.set(this.defaultNoPartner())
   }
 
+  onDealerChange(playerId: number | null) {
+    this.roundDealerPlayerId.set(playerId)
+    this.roundPickerPlayerId.set(null)
+    this.roundPartnerPlayerId.set(null)
+    this.roundResult.set('')
+    this.roundNoSchneider.set(false)
+    this.roundNoTrick.set(false)
+  }
+
   onPartnerChange(value: number | null) {
     if (value === -1) {
       this.roundNoPartner.set(true)
@@ -604,6 +632,7 @@ export class Games implements AfterViewInit {
     this.roundNoSchneider.set(false)
     this.roundNoPartner.set(this.defaultNoPartner())
     this.roundNoTrick.set(false)
+    this.roundDealerPlayerId.set(null)
     this.editingRoundId.set(null)
     this.isSubmittingRound.set(false)
     this.addRoundFormOpen.set(false)
@@ -624,7 +653,8 @@ export class Games implements AfterViewInit {
       }
       const pickerId = round.scores.find(s => s.player_role === 'Picker')?.player_id ?? null
       const partnerId = round.scores.find(s => s.player_role === 'Partner')?.player_id ?? null
-      return { round_number: round.round_number, totals: new Map(runningTotals), pickerId, partnerId }
+      const dealerId = round.scores.find(s => s.player_role === 'Dealer')?.player_id ?? null
+      return { round_number: round.round_number, totals: new Map(runningTotals), pickerId, partnerId, dealerId }
     })
 
     const lastRow = rows[rows.length - 1]

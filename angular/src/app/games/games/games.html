@@ -138,6 +138,7 @@
                         [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0"
                         [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0"
                         [class.winner-cell]="last && selectedGameScoreTable().winnerIds.has(player.player_id)"
+                        [class.score-cell--dealer]="row.dealerId === player.player_id"
                       >
                         <span class="score-value">
                           @if ((row.totals.get(player.player_id) ?? 0) < 0) {
@@ -286,7 +287,7 @@
     </div>
     <div class="dialog-footer">
       <button class="btn btn-secondary" (click)="gameWizardDialog.nativeElement.close(); step.set('idle')">Cancel</button>
-      <button class="btn btn-primary" (click)="submitGame()" [disabled]="newGamePlayers().length !== 3 && newGamePlayers().length !== 5">Start Game</button>
+      <button class="btn btn-primary" (click)="submitGame()" [disabled]="!isValidPlayerCount()">Start Game</button>
     </div>
   }
 
@@ -308,72 +309,86 @@
           <button class="btn btn-primary btn-add-round" (click)="addRoundFormOpen.set(true)">+ Add Round {{ currentRoundNumber() }}</button>
         }
       } @else {
-        <div class="form-group">
-          <label>Round result</label>
-          <select class="input" [ngModel]="roundResult()" (ngModelChange)="roundResult.set($event)">
-            <option value="" disabled>Select result</option>
-            <option value="Picker Win">Picker Win</option>
-            <option value="Picker Loss">Picker Loss</option>
-            <option value="Leaster">Leaster</option>
-          </select>
-        </div>
+        @if (isDealerGame()) {
+          <div class="form-group">
+            <label>Dealer (sits out this round)</label>
+            <select class="input" [ngModel]="roundDealerPlayerId()" (ngModelChange)="onDealerChange($event)">
+              <option [ngValue]="null" disabled>Select dealer</option>
+              @for (player of newGamePlayers(); track player.player_id) {
+                <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+              }
+            </select>
+          </div>
+        }
 
-        @if (roundResult()) {
-          @if (isLeasterRound()) {
-            <div class="form-group">
-              <label>Leaster Winner</label>
-              <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
-                <option [ngValue]="null" disabled>Select player</option>
-                @for (player of newGamePlayers(); track player.player_id) {
-                  <option [ngValue]="player.player_id">{{ player.player_name }}</option>
-                }
-              </select>
-            </div>
-          } @else {
-            <div class="form-row">
+        @if (!isDealerGame() || roundDealerPlayerId()) {
+          <div class="form-group">
+            <label>Round result</label>
+            <select class="input" [ngModel]="roundResult()" (ngModelChange)="roundResult.set($event)">
+              <option value="" disabled>Select result</option>
+              <option value="Picker Win">Picker Win</option>
+              <option value="Picker Loss">Picker Loss</option>
+              <option value="Leaster">Leaster</option>
+            </select>
+          </div>
+
+          @if (roundResult()) {
+            @if (isLeasterRound()) {
               <div class="form-group">
-                <label>Picker</label>
+                <label>Leaster Winner</label>
                 <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
-                  <option [ngValue]="null" disabled>Select picker</option>
-                  @for (player of newGamePlayers(); track player.player_id) {
+                  <option [ngValue]="null" disabled>Select player</option>
+                  @for (player of activeRoundPlayers(); track player.player_id) {
                     <option [ngValue]="player.player_id">{{ player.player_name }}</option>
                   }
                 </select>
               </div>
-
-              @if (showPartnerSelect()) {
+            } @else {
+              <div class="form-row">
                 <div class="form-group">
-                  <label>Partner</label>
-                  <select class="input" [ngModel]="partnerSelectValue()" (ngModelChange)="onPartnerChange($event)">
-                    <option [ngValue]="null" disabled>Select partner</option>
-                    <option [ngValue]="-1">No Partner</option>
-                    @for (player of newGamePlayers(); track player.player_id) {
-                      @if (player.player_id !== roundPickerPlayerId()) {
-                        <option [ngValue]="player.player_id">{{ player.player_name }}</option>
-                      }
+                  <label>Picker</label>
+                  <select class="input" [ngModel]="roundPickerPlayerId()" (ngModelChange)="onPickerChange($event)">
+                    <option [ngValue]="null" disabled>Select picker</option>
+                    @for (player of activeRoundPlayers(); track player.player_id) {
+                      <option [ngValue]="player.player_id">{{ player.player_name }}</option>
                     }
                   </select>
                 </div>
-              }
+
+                @if (showPartnerSelect()) {
+                  <div class="form-group">
+                    <label>Partner</label>
+                    <select class="input" [ngModel]="partnerSelectValue()" (ngModelChange)="onPartnerChange($event)">
+                      <option [ngValue]="null" disabled>Select partner</option>
+                      <option [ngValue]="-1">No Partner</option>
+                      @for (player of newGamePlayers(); track player.player_id) {
+                        @if (player.player_id !== roundPickerPlayerId()) {
+                          <option [ngValue]="player.player_id">{{ player.player_name }}</option>
+                        }
+                      }
+                    </select>
+                  </div>
+                }
+              </div>
+            }
+          }
+
+          @if (roundResult() && !isLeasterRound()) {
+            <div class="form-group">
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" [ngModel]="roundNoSchneider()" (ngModelChange)="toggleNoSchneider($event)" />
+                  No Schneider
+                </label>
+                @if (roundNoSchneider()) {
+                  <label class="checkbox-label">
+                    <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
+                    No Trick
+                  </label>
+                }
+              </div>
             </div>
           }
-        }
-
-        @if (roundResult() && !isLeasterRound()) {
-          <div class="form-group">
-            <div class="checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" [ngModel]="roundNoSchneider()" (ngModelChange)="toggleNoSchneider($event)" />
-                No Schneider
-              </label>
-              @if (roundNoSchneider()) {
-                <label class="checkbox-label">
-                  <input type="checkbox" [ngModel]="roundNoTrick()" (ngModelChange)="roundNoTrick.set($event)" />
-                  No Trick
-                </label>
-              }
-            </div>
-          </div>
         }
       }
 
@@ -386,8 +401,13 @@
                 <span class="score-player">{{ getPlayerName(score.player_id) }}</span>
                 <div class="score-row__result">
                   <span class="score-role" [class]="roleClass(score.player_role)">{{ score.player_role }}</span>
-                  <span class="score-delta" [class.delta-positive]="score.point_delta >= 0" [class.delta-negative]="score.point_delta < 0">
-                    {{ score.point_delta >= 0 ? '+' : '' }}{{ score.point_delta }}
+                  <span
+                    class="score-delta"
+                    [class.delta-positive]="score.player_role !== 'Dealer' && score.point_delta >= 0"
+                    [class.delta-negative]="score.point_delta < 0"
+                    [class.score-delta--dealer]="score.player_role === 'Dealer'"
+                  >
+                    {{ score.player_role === 'Dealer' ? '' : (score.point_delta >= 0 ? '+' : '') }}{{ score.point_delta }}
                   </span>
                 </div>
               </div>
@@ -398,7 +418,7 @@
 
       @if (addRoundFormOpen()) {
         <div class="mobile-round-summary-actions">
-          <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound()">
+          <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound() || (isDealerGame() && !roundDealerPlayerId())">
             @if (isSubmittingRound()) {
               Submitting...
             } @else if (editingRoundId()) {
@@ -445,6 +465,7 @@
                         [class.delta-positive]="(row.totals.get(player.player_id) ?? 0) >= 0"
                         [class.delta-negative]="(row.totals.get(player.player_id) ?? 0) < 0"
                         [class.winner-cell]="last && activeScoreTable().winnerIds.has(player.player_id)"
+                        [class.score-cell--dealer]="row.dealerId === player.player_id"
                       >
                         <span class="score-value">
                           @if ((row.totals.get(player.player_id) ?? 0) < 0) {
@@ -499,7 +520,7 @@
     </div>
     @if (authService.isAuthenticated()) {
       <div class="dialog-footer rounds-dialog-footer">
-        <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound()">
+        <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound() || (isDealerGame() && !roundDealerPlayerId())">
           @if (isSubmittingRound()) {
             Submitting...
           } @else if (editingRoundId()) {
