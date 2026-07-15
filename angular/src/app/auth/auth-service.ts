@@ -18,6 +18,7 @@ export class AuthService {
   expiresAt = this.tokenStore.expiresAt
   username = this.tokenStore.username
   claimedPlayerId = this.tokenStore.claimedPlayerId
+  claimedPlayerName = this.tokenStore.claimedPlayerName
   isAuthenticated = this.tokenStore.isAuthenticated
 
   constructor() {
@@ -69,7 +70,7 @@ export class AuthService {
 
   refreshMe(): Observable<AccountInfo> {
     return this.http.get<AccountInfo>(`${environment.apiUrl}/${environment.auth}/me`).pipe(
-      tap(info => this.tokenStore.setAccountInfo(info.username, info.claimed_player_id))
+      tap(info => this.tokenStore.setAccountInfo(info.username, info.claimed_player_id, info.claimed_player_name))
     )
   }
 
@@ -87,6 +88,6 @@ export class AuthService {
 
   private applySession(session: AuthSession) {
     this.tokenStore.persistTokens(session.access_token, session.refresh_token, session.expires_at)
-    this.tokenStore.setAccountInfo(session.username, session.claimed_player_id)
+    this.tokenStore.setAccountInfo(session.username, session.claimed_player_id, session.claimed_player_name)
   }
 }

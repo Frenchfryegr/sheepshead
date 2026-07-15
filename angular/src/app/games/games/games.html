@@ -22,7 +22,14 @@
       @for (game of sortedGames(); track game.game_id) {
         <div class="game-tile" (click)="selectGame(game)">
           <div class="game-tile__col">
-            <div class="game-tile__cell game-tile__date">{{ formatGameDateTime(game.game_datetime) }}</div>
+            <div class="game-tile__cell game-tile__date">
+              @if (game.game_name) {
+                <div class="game-tile__name">{{ game.game_name }}</div>
+                <div class="game-tile__date-sub">{{ formatShortGameDateTime(game.game_datetime) }}</div>
+              } @else {
+                {{ formatGameDateTime(game.game_datetime) }}
+              }
+            </div>
             <div class="game-tile__cell game-tile__hand">{{ game.num_players }}-hand</div>
             <div class="game-tile__cell game-tile__rounds">{{ game.Rounds.length }} Rounds Played</div>
           </div>
@@ -103,8 +110,30 @@
 
 <dialog #ShowGameRounds class="dialog dialog-completed" (click)="onGameRoundsBackdropClick($event)">
   <div class="dialog-header">
-    <h2>Game #{{ selectedGame?.game_id }}</h2>
-    <button class="btn-close" (click)="closeGameRoundsDialog()">&times;</button>
+    <div class="dialog-header__title">
+      @if (editingSelectedGameName()) {
+        <input
+          #selectedGameNameField
+          class="game-name-input"
+          type="text"
+          placeholder="Name this game"
+          [ngModel]="selectedGameNameInput()"
+          (ngModelChange)="selectedGameNameInput.set($event)"
+          (blur)="saveSelectedGameName()"
+          (keyup.enter)="selectedGameNameField.blur()"
+          (keyup.escape)="cancelEditSelectedGameName()"
+        />
+      } @else if (authService.isAuthenticated()) {
+        <h2 class="game-name-editable" (click)="startEditSelectedGameName()">
+          <span class="game-name-text">{{ selectedGame?.game_name || ('Game #' + selectedGame?.game_id) }}</span>
+        </h2>
+      } @else {
+        <h2>{{ selectedGame?.game_name || ('Game #' + selectedGame?.game_id) }}</h2>
+      }
+    </div>
+    @if (!editingSelectedGameName()) {
+      <button class="btn-close" (click)="closeGameRoundsDialog()">&times;</button>
+    }
   </div>
   <div class="dialog-body">
     @if (selectedGame) {
@@ -294,12 +323,32 @@
   @if (step() === 'rounds') {
     <div class="dialog-header">
       <div class="dialog-header__title">
-        <h2>{{ editingRoundId() ? 'Editing Round ' + activeRoundNumber() : 'Game ' + newGameId() }}</h2>
+        @if (editingRoundId()) {
+          <h2>Editing Round {{ activeRoundNumber() }}</h2>
+        } @else if (editingGameName()) {
+          <input
+            #gameNameField
+            class="game-name-input"
+            type="text"
+            placeholder="Name this game"
+            [ngModel]="gameNameInput()"
+            (ngModelChange)="gameNameInput.set($event)"
+            (blur)="saveGameName()"
+            (keyup.enter)="gameNameField.blur()"
+            (keyup.escape)="cancelEditGameName()"
+          />
+        } @else if (authService.isAuthenticated()) {
+          <h2 class="game-name-editable" (click)="startEditGameName()">
+            <span class="game-name-text">{{ newGameName() || ('Game ' + newGameId()) }}</span>
+          </h2>
+        } @else {
+          <h2>{{ newGameName() || ('Game ' + newGameId()) }}</h2>
+        }
         @if (!editingRoundId() && newGameDatetime()) {
           <span class="dialog-header__date">{{ formatGameDateTime(newGameDatetime()!) }}</span>
         }
       </div>
-      @if (!addRoundFormOpen()) {
+      @if (!addRoundFormOpen() && !editingGameName()) {
         <button class="btn-close" (click)="closeWizard()">&times;</button>
       }
     </div>

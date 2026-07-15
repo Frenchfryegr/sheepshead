@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, computed, HostListener, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { DatePipe, formatDate } from '@angular/common';
 import { GamesService } from '../games-service';
+import { GameRealtimeService } from '../game-realtime-service';
 import { AuthService } from '../../auth/auth-service';
 import { Game } from '../../interfaces/game';
 import { Player } from '../../interfaces/player';
@@ -42,6 +43,7 @@ type SortDirection = 'asc' | 'desc'
 })
 export class Games implements AfterViewInit {
   private gamesService = inject(GamesService)
+  private gameRealtime = inject(GameRealtimeService)
   protected authService = inject(AuthService)
   private gamesSignal = signal<Game[]>([])
   games = this.gamesSignal.asReadonly()
@@ -58,8 +60,21 @@ export class Games implements AfterViewInit {
 
   @ViewChild('ShowGameRounds') showGameRoundsDialog!: ElementRef<HTMLDialogElement>
   @ViewChild('GameWizardDialog') gameWizardDialog!: ElementRef<HTMLDialogElement>
+  @ViewChild('gameNameField') gameNameField?: ElementRef<HTMLInputElement>
+  @ViewChild('selectedGameNameField') selectedGameNameField?: ElementRef<HTMLInputElement>
 
   private savedScrollY = 0
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClickForGameName(event: MouseEvent) {
+    const target = event.target as Node
+    if (this.editingGameName() && this.gameNameField && !this.gameNameField.nativeElement.contains(target)) {
+      this.saveGameName()
+    }
+    if (this.editingSelectedGameName() && this.selectedGameNameField && !this.selectedGameNameField.nativeElement.contains(target)) {
+      this.saveSelectedGameName()
+    }
+  }
 
   ngAfterViewInit() {
     this.showGameRoundsDialog.nativeElement.addEventListener('close', () => this.unlockBodyScroll())
@@ -94,6 +109,11 @@ export class Games implements AfterViewInit {
   showPlayerDropdown = signal(false)
   newGameId = signal<number | null>(null)
   newGameDatetime = signal<string | null>(null)
+  newGameName = signal<string | null>(null)
+  editingGameName = signal(false)
+  gameNameInput = signal('')
+  editingSelectedGameName = signal(false)
+  selectedGameNameInput = signal('')
   currentRoundNumber = signal(1)
   roundPickerPlayerId = signal<number | null>(null)
   roundPartnerPlayerId = signal<number | null>(null)
@@ -133,6 +153,19 @@ export class Games implements AfterViewInit {
 
   constructor() {
     this.refreshGames()
+    this.gameRealtime.updates.subscribe(() => this.refetchCurrentGame())
+    this.gameRealtime.listUpdates.subscribe(() => this.refreshGames())
+    this.gameRealtime.connectList()
+  }
+
+  private refetchCurrentGame() {
+    const gameId = this.newGameId()
+    if (!gameId) return
+    this.gamesService.getGames().subscribe(games => {
+      this.gamesSignal.set(games)
+      const updatedGame = games.find(g => g.game_id === gameId)
+      if (updatedGame) this.refreshWizardRoundState(updatedGame)
+    })
   }
 
   refreshGames() {
@@ -206,6 +239,7 @@ export class Games implements AfterViewInit {
     this.confirmAndDeleteGame(gameId, () => {
       this.showGameRoundsDialog.nativeElement.close()
       this.completedActionsMenuOpen.set(false)
+      this.editingSelectedGameName.set(false)
       this.selectedGame = null
       this.refreshGames()
     })
@@ -239,10 +273,12 @@ export class Games implements AfterViewInit {
     this.newGamePlayers.set(players)
     this.newGameId.set(game.game_id)
     this.newGameDatetime.set(game.game_datetime)
+    this.newGameName.set(game.game_name)
     this.refreshWizardRoundState(game)
     this.resetRoundForm()
     this.step.set('rounds')
     this.showDialogModal(this.gameWizardDialog.nativeElement)
+    this.gameRealtime.connect(game.game_id)
   }
 
   private refreshWizardRoundState(game: Game) {
@@ -261,6 +297,7 @@ export class Games implements AfterViewInit {
     this.showPlayerDropdown.set(false)
     this.newGameId.set(null)
     this.newGameDatetime.set(null)
+    this.newGameName.set(null)
     this.currentRoundNumber.set(1)
     this.roundHistory.set([])
     this.resetRoundForm()
@@ -319,6 +356,7 @@ export class Games implements AfterViewInit {
     }).subscribe(game => {
       this.newGameId.set(game.game_id)
       this.newGameDatetime.set(game.game_datetime)
+      this.newGameName.set(game.game_name)
       this.step.set('rounds')
       this.resetRoundForm()
     })
@@ -500,6 +538,66 @@ export class Games implements AfterViewInit {
     this.gameWizardDialog.nativeElement.close()
     this.step.set('idle')
     this.roundActionsMenuOpen.set(false)
+    this.editingGameName.set(false)
+    this.gameRealtime.disconnect()
+  }
+
+  startEditGameName() {
+    if (!this.authService.isAuthenticated()) return
+    this.gameNameInput.set(this.newGameName() ?? '')
+    this.editingGameName.set(true)
+  }
+
+  saveGameName() {
+    const gameId = this.newGameId()
+    this.editingGameName.set(false)
+    if (!gameId) return
+    const newName = this.gameNameInput().trim() || null
+    const previousName = this.newGameName()
+    if (newName === previousName) return
+    this.newGameName.set(newName)
+    this.gamesService.setGameName(gameId, newName).subscribe({
+      next: updated => {
+        this.newGameName.set(updated.game_name)
+        this.refreshGames()
+      },
+      error: () => {
+        this.newGameName.set(previousName)
+      }
+    })
+  }
+
+  cancelEditGameName() {
+    this.editingGameName.set(false)
+  }
+
+  startEditSelectedGameName() {
+    if (!this.authService.isAuthenticated() || !this.selectedGame) return
+    this.selectedGameNameInput.set(this.selectedGame.game_name ?? '')
+    this.editingSelectedGameName.set(true)
+  }
+
+  saveSelectedGameName() {
+    this.editingSelectedGameName.set(false)
+    if (!this.selectedGame) return
+    const gameId = this.selectedGame.game_id
+    const newName = this.selectedGameNameInput().trim() || null
+    const previousName = this.selectedGame.game_name
+    if (newName === previousName) return
+    this.selectedGame.game_name = newName
+    this.gamesService.setGameName(gameId, newName).subscribe({
+      next: updated => {
+        if (this.selectedGame) this.selectedGame.game_name = updated.game_name
+        this.refreshGames()
+      },
+      error: () => {
+        if (this.selectedGame) this.selectedGame.game_name = previousName
+      }
+    })
+  }
+
+  cancelEditSelectedGameName() {
+    this.editingSelectedGameName.set(false)
   }
 
   toggleRoundActionsMenu() {
@@ -514,6 +612,7 @@ export class Games implements AfterViewInit {
   closeGameRoundsDialog() {
     this.showGameRoundsDialog.nativeElement.close()
     this.completedActionsMenuOpen.set(false)
+    this.editingSelectedGameName.set(false)
   }
 
   toggleCompletedActionsMenu() {
@@ -593,6 +692,14 @@ export class Games implements AfterViewInit {
     const datePart = formatDate(normalized, 'EEE MMM d, y', 'en-US')
     const timePart = formatDate(normalized, 'h:mm a', 'en-US').replace(' ', '').toLowerCase()
     return `${datePart}: ${timePart}`
+  }
+
+  formatShortGameDateTime(isoDateTime: string): string {
+    const normalized = this.normalizeDatetime(isoDateTime)
+    const month = formatDate(normalized, 'MMM', 'en-US')
+    const dayYear = formatDate(normalized, 'd, y', 'en-US')
+    const timePart = formatDate(normalized, 'h:mm a', 'en-US').replace(' ', '').toLowerCase()
+    return `${month}. ${dayYear} ${timePart}`
   }
 
   normalizeDatetime(isoDateTime: string): string {

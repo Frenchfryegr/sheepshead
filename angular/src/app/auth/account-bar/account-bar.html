@@ -2,7 +2,7 @@
   @if (authService.isAuthenticated()) {
     <span class="account-bar__username">{{ authService.username() }}</span>
     @if (authService.claimedPlayerId()) {
-      <button class="account-bar__link" (click)="openClaimDialog()">Playing as: {{ claimedPlayerName() }}</button>
+      <button class="account-bar__link" (click)="openClaimDialog()">Playing as: {{ authService.claimedPlayerName() }}</button>
     } @else {
       <button class="account-bar__link" (click)="openClaimDialog()">Claim a player</button>
     }
