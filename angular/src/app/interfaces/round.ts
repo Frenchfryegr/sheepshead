@@ -14,7 +14,7 @@ export interface Round extends RoundRow {
 
 export type RoundResult = "Picker Win" | "Picker Loss" | "Leaster"
 
-export type PlayerRole = "Picker" | "Partner" | "Opponent" | "Leaster Winner" | "Leaster Loser"
+export type PlayerRole = "Picker" | "Partner" | "Opponent" | "Leaster Winner" | "Leaster Loser" | "Dealer"
 
 export interface PlayerRoundScore {
     player_id: number

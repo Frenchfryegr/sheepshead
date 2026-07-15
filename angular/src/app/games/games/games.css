@@ -711,6 +711,15 @@
   color: #6b21a8;
 }
 
+.role--Dealer {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.score-delta--dealer {
+  color: #4b5563;
+}
+
 .score-delta {
   font-weight: 700;
   font-size: 0.95rem;
@@ -854,6 +863,14 @@
   background: #d1fae5;
   color: #065f46;
   font-weight: 700;
+}
+
+.score-table td.score-cell--dealer:not(.winner-cell) {
+  background: #f3f4f6;
+}
+
+.score-cell--dealer .score-value {
+  color: #9ca3af;
 }
 
 @media (max-width: 640px) {
