@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from enum import Enum
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Body, Header, HTTPException, Depends
+from fastapi import FastAPI, Body, Header, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 
@@ -80,6 +80,75 @@ def get_current_user_id(authorization: str = Header(None)) -> str:
     return user_response.user.id
 
 
+class GameConnectionManager:
+    def __init__(self):
+        self.connections: dict[int, set[WebSocket]] = {}
+        self.list_connections: set[WebSocket] = set()
+
+    async def connect(self, game_id: int, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.setdefault(game_id, set()).add(websocket)
+
+    def disconnect(self, game_id: int, websocket: WebSocket):
+        conns = self.connections.get(game_id)
+        if conns:
+            conns.discard(websocket)
+            if not conns:
+                del self.connections[game_id]
+
+    async def broadcast(self, game_id: int):
+        for ws in list(self.connections.get(game_id, [])):
+            try:
+                await ws.send_json({"type": "game_updated", "game_id": game_id})
+            except Exception:
+                self.disconnect(game_id, ws)
+
+    async def connect_list(self, websocket: WebSocket):
+        await websocket.accept()
+        self.list_connections.add(websocket)
+
+    def disconnect_list(self, websocket: WebSocket):
+        self.list_connections.discard(websocket)
+
+    async def broadcast_list(self):
+        for ws in list(self.list_connections):
+            try:
+                await ws.send_json({"type": "games_list_updated"})
+            except Exception:
+                self.disconnect_list(ws)
+
+
+game_connections = GameConnectionManager()
+
+
+@app.websocket("/ws/games/{game_id}")
+async def game_updates_ws(websocket: WebSocket, game_id: int):
+    origin = websocket.headers.get("origin")
+    if origin and origin not in allowed_origins:
+        await websocket.close(code=1008)
+        return
+    await game_connections.connect(game_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        game_connections.disconnect(game_id, websocket)
+
+
+@app.websocket("/ws/games")
+async def games_list_ws(websocket: WebSocket):
+    origin = websocket.headers.get("origin")
+    if origin and origin not in allowed_origins:
+        await websocket.close(code=1008)
+        return
+    await game_connections.connect_list(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        game_connections.disconnect_list(websocket)
+
+
 @app.get("/", tags=["Default"])
 def read_root():
     return {"Bruh": "You made a request to the base endpoint. You probably don't know what you're doing huh"}
@@ -95,7 +164,7 @@ def get_games():
     return response.data
 
 @app.post("/games", tags=["Game Management"])
-def create_game(num_players: int = Body(...), player_ids: list[int] = Body(...), user_id: str = Depends(get_current_user_id)):
+async def create_game(num_players: int = Body(...), player_ids: list[int] = Body(...), user_id: str = Depends(get_current_user_id)):
     game_response = (
         supabase.table(TABLE_NAMES.GAMES.value)
         .insert({"num_players": num_players, "game_datetime": datetime.now(timezone.utc).isoformat()})
@@ -107,10 +176,13 @@ def create_game(num_players: int = Body(...), player_ids: list[int] = Body(...),
     player_x_game_rows = [{"player_id": pid, "game_id": game_id} for pid in player_ids]
     supabase.table(TABLE_NAMES.PLAYERSXGAMES.value).insert(player_x_game_rows).execute()
 
+    await game_connections.broadcast_list()
     return game
 
 @app.delete("/games/{game_id}", tags=["Game Management"])
-def delete_game(game_id, user_id: str = Depends(get_current_user_id)):
+async def delete_game(game_id, user_id: str = Depends(get_current_user_id)):
+    await game_connections.broadcast(int(game_id))
+
     rounds_response = (
         supabase.table(TABLE_NAMES.ROUNDS.value)
         .select("round_id")
@@ -130,20 +202,23 @@ def delete_game(game_id, user_id: str = Depends(get_current_user_id)):
         .eq("game_id", game_id)
         .execute()
     )
+    await game_connections.broadcast_list()
     return response.data
 
 @app.patch("/games/{game_id}/status", tags=["Game Management"])
-def set_game_status(game_id, is_completed: bool = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
+async def set_game_status(game_id, is_completed: bool = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
         .update({"is_completed": is_completed})
         .eq("game_id", game_id)
         .execute()
     )
+    await game_connections.broadcast(int(game_id))
+    await game_connections.broadcast_list()
     return response.data[0]
 
 @app.patch("/games/{game_id}/name", tags=["Game Management"])
-def set_game_name(game_id, game_name: str | None = Body(None, embed=True), user_id: str = Depends(get_current_user_id)):
+async def set_game_name(game_id, game_name: str | None = Body(None, embed=True), user_id: str = Depends(get_current_user_id)):
     normalized_name = game_name.strip() if game_name else None
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
@@ -151,16 +226,20 @@ def set_game_name(game_id, game_name: str | None = Body(None, embed=True), user_
         .eq("game_id", game_id)
         .execute()
     )
+    await game_connections.broadcast(int(game_id))
+    await game_connections.broadcast_list()
     return response.data[0]
 
 @app.patch("/games/{game_id}/complete", tags=["Game Management"])
-def complete_game(game_id, user_id: str = Depends(get_current_user_id)):
+async def complete_game(game_id, user_id: str = Depends(get_current_user_id)):
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
         .update({"is_completed": True})
         .eq("game_id", game_id)
         .execute()
     )
+    await game_connections.broadcast(int(game_id))
+    await game_connections.broadcast_list()
     return response.data[0]
 
 @app.get("/rounds/{game_id}", tags=["Game Management"])
@@ -174,7 +253,7 @@ def get_rounds_in_game(game_id):
     return response.data
 
 @app.post("/rounds", tags=["Game Management"])
-def create_round(
+async def create_round(
     game_id: int = Body(...),
     round_number: int = Body(...),
     round_result: ROUND_RESULTS = Body(...),
@@ -198,10 +277,12 @@ def create_round(
     ]
     supabase.table(TABLE_NAMES.PLAYERROUNDSCORE.value).insert(score_rows).execute()
 
+    await game_connections.broadcast(game_id)
+    await game_connections.broadcast_list()
     return created_round
 
 @app.patch("/rounds/{round_id}", tags=["Game Management"])
-def update_round(
+async def update_round(
     round_id,
     round_result: ROUND_RESULTS = Body(...),
     no_schneider: bool = Body(False),
@@ -226,10 +307,12 @@ def update_round(
     ]
     supabase.table(TABLE_NAMES.PLAYERROUNDSCORE.value).insert(score_rows).execute()
 
+    await game_connections.broadcast(int(updated_round["game_id"]))
+    await game_connections.broadcast_list()
     return updated_round
 
 @app.delete("/rounds/{round_id}", tags=["Game Management"])
-def delete_round(round_id, user_id: str = Depends(get_current_user_id)):
+async def delete_round(round_id, user_id: str = Depends(get_current_user_id)):
     round_lookup = (
         supabase.table(TABLE_NAMES.ROUNDS.value)
         .select("game_id, round_number")
@@ -259,6 +342,8 @@ def delete_round(round_id, user_id: str = Depends(get_current_user_id)):
     for round_row in later_rounds.data:
         supabase.table(TABLE_NAMES.ROUNDS.value).update({"round_number": round_row["round_number"] - 1}).eq("round_id", round_row["round_id"]).execute()
 
+    await game_connections.broadcast(int(game_id))
+    await game_connections.broadcast_list()
     return response.data
 
 @app.get("/players", tags=["Player Management"])

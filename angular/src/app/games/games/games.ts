@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, computed, HostListener, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { DatePipe, formatDate } from '@angular/common';
 import { GamesService } from '../games-service';
+import { GameRealtimeService } from '../game-realtime-service';
 import { AuthService } from '../../auth/auth-service';
 import { Game } from '../../interfaces/game';
 import { Player } from '../../interfaces/player';
@@ -42,6 +43,7 @@ type SortDirection = 'asc' | 'desc'
 })
 export class Games implements AfterViewInit {
   private gamesService = inject(GamesService)
+  private gameRealtime = inject(GameRealtimeService)
   protected authService = inject(AuthService)
   private gamesSignal = signal<Game[]>([])
   games = this.gamesSignal.asReadonly()
@@ -151,6 +153,19 @@ export class Games implements AfterViewInit {
 
   constructor() {
     this.refreshGames()
+    this.gameRealtime.updates.subscribe(() => this.refetchCurrentGame())
+    this.gameRealtime.listUpdates.subscribe(() => this.refreshGames())
+    this.gameRealtime.connectList()
+  }
+
+  private refetchCurrentGame() {
+    const gameId = this.newGameId()
+    if (!gameId) return
+    this.gamesService.getGames().subscribe(games => {
+      this.gamesSignal.set(games)
+      const updatedGame = games.find(g => g.game_id === gameId)
+      if (updatedGame) this.refreshWizardRoundState(updatedGame)
+    })
   }
 
   refreshGames() {
@@ -263,6 +278,7 @@ export class Games implements AfterViewInit {
     this.resetRoundForm()
     this.step.set('rounds')
     this.showDialogModal(this.gameWizardDialog.nativeElement)
+    this.gameRealtime.connect(game.game_id)
   }
 
   private refreshWizardRoundState(game: Game) {
@@ -523,6 +539,7 @@ export class Games implements AfterViewInit {
     this.step.set('idle')
     this.roundActionsMenuOpen.set(false)
     this.editingGameName.set(false)
+    this.gameRealtime.disconnect()
   }
 
   startEditGameName() {
@@ -536,10 +553,17 @@ export class Games implements AfterViewInit {
     this.editingGameName.set(false)
     if (!gameId) return
     const newName = this.gameNameInput().trim() || null
-    if (newName === this.newGameName()) return
-    this.gamesService.setGameName(gameId, newName).subscribe(updated => {
-      this.newGameName.set(updated.game_name)
-      this.refreshGames()
+    const previousName = this.newGameName()
+    if (newName === previousName) return
+    this.newGameName.set(newName)
+    this.gamesService.setGameName(gameId, newName).subscribe({
+      next: updated => {
+        this.newGameName.set(updated.game_name)
+        this.refreshGames()
+      },
+      error: () => {
+        this.newGameName.set(previousName)
+      }
     })
   }
 
@@ -558,10 +582,17 @@ export class Games implements AfterViewInit {
     if (!this.selectedGame) return
     const gameId = this.selectedGame.game_id
     const newName = this.selectedGameNameInput().trim() || null
-    if (newName === this.selectedGame.game_name) return
-    this.gamesService.setGameName(gameId, newName).subscribe(updated => {
-      if (this.selectedGame) this.selectedGame.game_name = updated.game_name
-      this.refreshGames()
+    const previousName = this.selectedGame.game_name
+    if (newName === previousName) return
+    this.selectedGame.game_name = newName
+    this.gamesService.setGameName(gameId, newName).subscribe({
+      next: updated => {
+        if (this.selectedGame) this.selectedGame.game_name = updated.game_name
+        this.refreshGames()
+      },
+      error: () => {
+        if (this.selectedGame) this.selectedGame.game_name = previousName
+      }
     })
   }
 
