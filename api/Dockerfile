@@ -16,7 +16,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
 RUN uv sync --frozen --no-dev
 
-RUN groupadd --system app && useradd --system --gid app app && chown -R app:app /app
+RUN groupadd --system app && useradd --system --create-home --home-dir /home/app --gid app app && chown -R app:app /app /home/app
 USER app
 
 ENV PATH="/app/.venv/bin:$PATH"
