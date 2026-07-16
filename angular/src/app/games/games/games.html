@@ -130,6 +130,9 @@
       } @else {
         <h2>{{ selectedGame?.game_name || ('Game #' + selectedGame?.game_id) }}</h2>
       }
+      @if (!editingSelectedGameName() && selectedGame) {
+        <span class="dialog-header__date">{{ formatGameDateTime(selectedGame.game_datetime) }}</span>
+      }
     </div>
     @if (!editingSelectedGameName()) {
       <button class="btn-close" (click)="closeGameRoundsDialog()">&times;</button>
