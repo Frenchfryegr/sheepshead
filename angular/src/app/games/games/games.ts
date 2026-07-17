@@ -62,6 +62,7 @@ export class Games implements AfterViewInit {
   @ViewChild('GameWizardDialog') gameWizardDialog!: ElementRef<HTMLDialogElement>
   @ViewChild('gameNameField') gameNameField?: ElementRef<HTMLInputElement>
   @ViewChild('selectedGameNameField') selectedGameNameField?: ElementRef<HTMLInputElement>
+  @ViewChild('ActiveScoreboardWrapper') activeScoreboardWrapper?: ElementRef<HTMLElement>
 
   private savedScrollY = 0
 
@@ -162,10 +163,24 @@ export class Games implements AfterViewInit {
   private refetchCurrentGame() {
     const gameId = this.newGameId()
     if (!gameId) return
+    const previousRoundCount = this.roundHistory().length
     this.gamesService.getGames().subscribe(games => {
       this.gamesSignal.set(games)
       const updatedGame = games.find(g => g.game_id === gameId)
-      if (updatedGame) this.refreshWizardRoundState(updatedGame)
+      if (updatedGame) {
+        this.refreshWizardRoundState(updatedGame)
+        if (updatedGame.Rounds.length > previousRoundCount) {
+          this.scrollActiveScoreboardToBottom()
+        }
+      }
+    })
+  }
+
+  private scrollActiveScoreboardToBottom() {
+    setTimeout(() => {
+      const wrapper = this.activeScoreboardWrapper?.nativeElement
+      if (!wrapper || wrapper.scrollHeight <= wrapper.clientHeight) return
+      wrapper.scrollTop = wrapper.scrollHeight
     })
   }
 
