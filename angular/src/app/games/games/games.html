@@ -143,19 +143,26 @@
       @if (selectedGameScoreTable().rows.length > 0) {
         <div class="form-group">
           <label class="scoreboard-label">Scoreboard</label>
-          <div class="table-wrapper">
+          <div class="table-wrapper score-table-wrapper">
             <table class="score-table">
               <thead>
                 <tr>
-                  <th>Round</th>
+                  <th><span class="round-label-full">Round</span></th>
                   @for (player of selectedGameScoreTable().players; track player.player_id) {
                     <th
                       class="initials-header"
                       [class.winner-cell]="selectedGameScoreTable().winnerIds.has(player.player_id)"
                       [class.tooltip-open]="activeInitialsTooltip() === player.player_id"
+                      [style.background-color]="scoreboardColor(player)"
+                      [style.color]="scoreboardTextColor(player)"
                       (click)="toggleInitialsTooltip(player.player_id, $event)"
                     >
-                      {{ selectedGameScoreTable().initials.get(player.player_id) }}
+                      <span class="initials-content">
+                        <span class="initials-text">{{ selectedGameScoreTable().initials.get(player.player_id) }}</span>
+                        @if (player.scoreboard_avatar_url) {
+                          <img class="initials-avatar" [src]="player.scoreboard_avatar_url" alt="" />
+                        }
+                      </span>
                       <span class="initials-tooltip">{{ player.player_name }}</span>
                     </th>
                   }
@@ -239,7 +246,12 @@
   }
 </dialog>
 
-<dialog #GameWizardDialog class="dialog dialog-wizard" (click)="onWizardBackdropClick($event)">
+<dialog
+  #GameWizardDialog
+  class="dialog dialog-wizard"
+  [class.dialog-wizard--scoreboard-display]="scoreboardDisplayMode()"
+  (click)="onWizardBackdropClick($event)"
+>
   @if (step() === 'players') {
     <div class="dialog-header">
       <h2>New Game</h2>
@@ -351,16 +363,28 @@
           <span class="dialog-header__date">{{ formatGameDateTime(newGameDatetime()!) }}</span>
         }
       </div>
+      @if (!editingRoundId() && !editingGameName()) {
+        <button
+          class="scoreboard-display-toggle"
+          type="button"
+          [attr.aria-pressed]="scoreboardDisplayMode()"
+          [class.scoreboard-display-toggle--on]="scoreboardDisplayMode()"
+          (click)="toggleScoreboardDisplayMode()"
+        >
+          <span>Scoreboard</span>
+          <span class="scoreboard-display-toggle__switch" aria-hidden="true"></span>
+        </button>
+      }
       @if (!addRoundFormOpen() && !editingGameName()) {
         <button class="btn-close" (click)="closeWizard()">&times;</button>
       }
     </div>
     <div class="dialog-body">
-      @if (!addRoundFormOpen()) {
+      @if (!addRoundFormOpen() && !scoreboardDisplayMode()) {
         @if (authService.isAuthenticated()) {
           <button class="btn btn-primary btn-add-round" (click)="addRoundFormOpen.set(true)">+ Add Round {{ currentRoundNumber() }}</button>
         }
-      } @else {
+      } @else if (addRoundFormOpen() && !scoreboardDisplayMode()) {
         @if (isDealerGame()) {
           <div class="form-group">
             <label>Dealer (sits out this round)</label>
@@ -468,7 +492,7 @@
         </div>
       }
 
-      @if (addRoundFormOpen()) {
+      @if (addRoundFormOpen() && !scoreboardDisplayMode()) {
         <div class="mobile-round-summary-actions">
           <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound() || (isDealerGame() && !roundDealerPlayerId())">
             @if (isSubmittingRound()) {
@@ -487,22 +511,29 @@
         </div>
       }
 
-      <div class="form-group" [class.mobile-hidden-when-summary]="addRoundFormOpen()">
+      <div class="form-group scoreboard-form-group" [class.mobile-hidden-when-summary]="addRoundFormOpen()">
         @if (activeScoreTable().rows.length > 0) {
           <label class="scoreboard-label">Scoreboard</label>
-          <div class="table-wrapper">
+          <div #ActiveScoreboardWrapper class="table-wrapper score-table-wrapper">
             <table class="score-table">
               <thead>
                 <tr>
-                  <th>Round</th>
+                  <th><span class="round-label-full">Round</span></th>
                   @for (player of activeScoreTable().players; track player.player_id) {
                     <th
                       class="initials-header"
                       [class.winner-cell]="activeScoreTable().winnerIds.has(player.player_id)"
                       [class.tooltip-open]="activeInitialsTooltip() === player.player_id"
+                      [style.background-color]="scoreboardColor(player)"
+                      [style.color]="scoreboardTextColor(player)"
                       (click)="toggleInitialsTooltip(player.player_id, $event)"
                     >
-                      {{ activeScoreTable().initials.get(player.player_id) }}
+                      <span class="initials-content">
+                        <span class="initials-text">{{ activeScoreTable().initials.get(player.player_id) }}</span>
+                        @if (player.scoreboard_avatar_url) {
+                          <img class="initials-avatar" [src]="player.scoreboard_avatar_url" alt="" />
+                        }
+                      </span>
                       <span class="initials-tooltip">{{ player.player_name }}</span>
                     </th>
                   }
@@ -539,6 +570,7 @@
         }
       </div>
 
+      @if (!scoreboardDisplayMode()) {
       <div class="form-group" [class.mobile-hidden-when-summary]="addRoundFormOpen()">
         @if (roundHistory().length > 0) {
           <label class="scoreboard-label">Rounds Played</label>
@@ -558,7 +590,7 @@
                     <span class="round-tag round-tag--partner"><span class="round-tag__full">No Partner</span><span class="round-tag__abbr">NP</span></span>
                   }
                 </div>
-                @if (authService.isAuthenticated()) {
+                @if (authService.isAuthenticated() && !scoreboardDisplayMode()) {
                   <div class="round-row__actions">
                     <button class="btn-icon" (click)="editRound(entry)" aria-label="Edit round">Edit</button>
                     <button class="btn-icon btn-icon-danger" (click)="deleteRoundEntry(entry)" aria-label="Delete round">Delete</button>
@@ -569,8 +601,9 @@
           </div>
         }
       </div>
+      }
     </div>
-    @if (authService.isAuthenticated()) {
+    @if (authService.isAuthenticated() && !scoreboardDisplayMode()) {
       <div class="dialog-footer rounds-dialog-footer">
         <button class="btn btn-primary" (click)="submitRound()" [disabled]="!roundPickerPlayerId() || !roundResult() || isSubmittingRound() || (isDealerGame() && !roundDealerPlayerId())">
           @if (isSubmittingRound()) {

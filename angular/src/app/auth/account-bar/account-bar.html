@@ -1,11 +1,15 @@
 <div class="account-bar">
   @if (authService.isAuthenticated()) {
-    <span class="account-bar__username">{{ authService.username() }}</span>
-    @if (authService.claimedPlayerId()) {
-      <button class="account-bar__link" (click)="openClaimDialog()">Playing as: {{ authService.claimedPlayerName() }}</button>
-    } @else {
-      <button class="account-bar__link" (click)="openClaimDialog()">Claim a player</button>
-    }
+    <button class="account-bar__profile" type="button" (click)="openProfile()" aria-label="Open profile">
+      <span class="account-bar__avatar">
+        @if (authService.avatarUrl()) {
+          <img [src]="authService.avatarUrl()" alt="" />
+        } @else {
+          <span>{{ profileFallback() }}</span>
+        }
+      </span>
+      <span class="account-bar__username">{{ authService.username() }}</span>
+    </button>
     <button class="account-bar__link" (click)="logout()">Log Out</button>
   } @else {
     <button class="account-bar__link" (click)="openAuthDialog('login')">Log In</button>

@@ -9,9 +9,10 @@ import { App } from './app';
 import { Games } from './games/games/games';
 import { AuthInterceptor } from './auth/auth-interceptor';
 import { AccountBar } from './auth/account-bar/account-bar';
+import { Profile } from './profile/profile';
 
 @NgModule({
-  declarations: [App, Games, AccountBar],
+  declarations: [App, Games, AccountBar, Profile],
   imports: [BrowserModule, AppRoutingModule, FormsModule, HttpClientModule],
   providers: [
     provideBrowserGlobalErrorListeners(),
