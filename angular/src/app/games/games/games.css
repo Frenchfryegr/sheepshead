@@ -787,6 +787,7 @@
   color: #e0e0e0;
   font-weight: 600;
   font-size: 0.9rem;
+  max-width: 200px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 10px 0px;
@@ -799,7 +800,7 @@
 .score-table th:first-child {
   background: #b5b6b9;
   color: #6b7280;
-  width: 35px;
+  width: 60px;
   text-align: center;
 }
 
@@ -809,6 +810,7 @@
   font-weight: 600;
   text-align: center;
   border-bottom: 1px solid #f3f4f6;
+  max-width: 200px;
 }
 
 .score-table td:first-child {
@@ -1041,7 +1043,7 @@
   }
 
   .dialog-wizard--scoreboard-display .score-table th {
-    font-size: 1.12rem;
+    /* font-size: 1.12rem; */
     line-height: 1.12;
     padding: 5px 4px;
   }
