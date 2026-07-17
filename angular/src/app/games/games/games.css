@@ -772,6 +772,11 @@
   border-collapse: collapse;
 }
 
+.score-table-wrapper {
+  max-height: min(55vh, 520px);
+  overflow: auto;
+}
+
 .score-table th {
   background: #1a1a2e;
   color: #e0e0e0;
@@ -781,6 +786,9 @@
   letter-spacing: 0.05em;
   padding: 10px 14px;
   text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .score-table th:first-child {
@@ -849,7 +857,7 @@
 }
 
 .score-table th.initials-header {
-  position: relative;
+  position: sticky;
   cursor: pointer;
   max-width: 92px;
   overflow: visible;
@@ -859,7 +867,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  flex-direction: column;
+  gap: 4px;
   max-width: 100%;
   min-width: 0;
   line-height: 1;

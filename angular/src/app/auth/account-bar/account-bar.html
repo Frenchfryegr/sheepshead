@@ -10,11 +10,6 @@
       </span>
       <span class="account-bar__username">{{ authService.username() }}</span>
     </button>
-    @if (authService.claimedPlayerId()) {
-      <button class="account-bar__link" (click)="openClaimDialog()">Playing as: {{ authService.claimedPlayerName() }}</button>
-    } @else {
-      <button class="account-bar__link" (click)="openClaimDialog()">Claim a player</button>
-    }
     <button class="account-bar__link" (click)="logout()">Log Out</button>
   } @else {
     <button class="account-bar__link" (click)="openAuthDialog('login')">Log In</button>
