@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { of } from 'rxjs';
 
 import { AuthService } from '../auth/auth-service';
+import { GamesService } from '../games/games-service';
 import { Profile } from './profile';
 
 describe('Profile', () => {
@@ -35,6 +36,12 @@ describe('Profile', () => {
             updateProfile: () => of(profile),
             uploadProfilePicture: () => of(profile),
             deleteProfilePicture: () => of(profile),
+          },
+        },
+        {
+          provide: GamesService,
+          useValue: {
+            getPlayers: () => of([]),
           },
         },
         { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },

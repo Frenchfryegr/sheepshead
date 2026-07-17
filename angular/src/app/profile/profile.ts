@@ -1,8 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '../auth/auth-service';
+import { GamesService } from '../games/games-service';
 import { ProfileInfo } from '../interfaces/auth';
+import { Player } from '../interfaces/player';
 
 const MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
 
@@ -14,7 +16,10 @@ const MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
 })
 export class Profile implements OnInit {
   private authService = inject(AuthService)
+  private gamesService = inject(GamesService)
   private router = inject(Router)
+
+  @ViewChild('ClaimDialog') claimDialog!: ElementRef<HTMLDialogElement>
 
   profile = signal<ProfileInfo | null>(null)
   username = signal('')
@@ -28,6 +33,8 @@ export class Profile implements OnInit {
   isSaving = signal(false)
   isUploading = signal(false)
   isDeletingPicture = signal(false)
+  players = signal<Player[]>([])
+  claimError = signal<string | null>(null)
 
   ngOnInit() {
     this.loadProfile()
@@ -121,6 +128,42 @@ export class Profile implements OnInit {
         this.errorMessage.set(err?.error?.detail ?? 'Could not delete profile picture')
         this.isDeletingPicture.set(false)
       }
+    })
+  }
+
+  openClaimDialog() {
+    this.claimError.set(null)
+    this.gamesService.getPlayers().subscribe({
+      next: players => {
+        this.players.set(players)
+        this.claimDialog.nativeElement.showModal()
+      },
+      error: (err) => this.errorMessage.set(err?.error?.detail ?? 'Could not load players')
+    })
+  }
+
+  closeClaimDialog() {
+    this.claimDialog.nativeElement.close()
+  }
+
+  onClaimBackdropClick(event: MouseEvent) {
+    if (event.target !== event.currentTarget) return
+    this.closeClaimDialog()
+  }
+
+  claim(playerId: number) {
+    this.claimError.set(null)
+    this.authService.claimPlayer(playerId).subscribe({
+      next: profile => this.applyProfile(profile),
+      error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not claim player')
+    })
+  }
+
+  unclaim(playerId: number) {
+    this.claimError.set(null)
+    this.authService.unclaimPlayer(playerId).subscribe({
+      next: profile => this.applyProfile(profile),
+      error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not unclaim player')
     })
   }
 

@@ -18,11 +18,14 @@
           }
         </div>
         <div>
-          <h1>Profile</h1>
+          <h1>{{ profile()?.username }}</h1>
           @if (profile()?.claimed_player_name) {
-            <p>Playing as {{ profile()?.claimed_player_name }}</p>
+            <p class="profile-playing-as">
+              <span>Playing as </span>
+              <button class="profile-claimed-player" type="button" (click)="openClaimDialog()">{{ profile()?.claimed_player_name }}</button>
+            </p>
           } @else {
-            <p>No player claimed</p>
+            <button class="profile-claimed-player" type="button" (click)="openClaimDialog()">No player claimed</button>
           }
         </div>
       </div>
@@ -97,3 +100,31 @@
     </section>
   }
 </main>
+
+<dialog #ClaimDialog class="profile-dialog" (click)="onClaimBackdropClick($event)">
+  <div class="profile-dialog__header">
+    <h2>Claim a Player</h2>
+    <button class="btn-close" type="button" (click)="closeClaimDialog()">&times;</button>
+  </div>
+  <div class="profile-dialog__body">
+    @if (claimError()) {
+      <p class="profile-message profile-message--error">{{ claimError() }}</p>
+    }
+    @if (players().length === 0) {
+      <p class="text-muted">No players yet.</p>
+    } @else {
+      <div class="profile-player-list">
+        @for (player of players(); track player.player_id) {
+          <div class="profile-player-row">
+            <span>{{ player.player_name }}</span>
+            @if (profile()?.claimed_player_id === player.player_id) {
+              <button class="btn btn-secondary profile-player-btn" type="button" (click)="unclaim(player.player_id)">Unclaim</button>
+            } @else {
+              <button class="btn btn-primary profile-player-btn" type="button" (click)="claim(player.player_id)" [disabled]="!!profile()?.claimed_player_id">Claim</button>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+</dialog>
