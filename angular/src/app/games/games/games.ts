@@ -128,6 +128,7 @@ export class Games implements AfterViewInit {
   roundActionsMenuOpen = signal(false)
   completedActionsMenuOpen = signal(false)
   addRoundFormOpen = signal(false)
+  scoreboardDisplayMode = signal(false)
 
   isLeasterRound = computed(() => this.roundResult() === 'Leaster')
   showPartnerSelect = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
@@ -539,6 +540,7 @@ export class Games implements AfterViewInit {
     this.step.set('idle')
     this.roundActionsMenuOpen.set(false)
     this.editingGameName.set(false)
+    this.scoreboardDisplayMode.set(false)
     this.gameRealtime.disconnect()
   }
 
@@ -602,6 +604,17 @@ export class Games implements AfterViewInit {
 
   toggleRoundActionsMenu() {
     this.roundActionsMenuOpen.set(!this.roundActionsMenuOpen())
+  }
+
+  toggleScoreboardDisplayMode() {
+    this.scoreboardDisplayMode.update(enabled => {
+      const next = !enabled
+      if (next) {
+        this.resetRoundForm()
+        this.roundActionsMenuOpen.set(false)
+      }
+      return next
+    })
   }
 
   onGameRoundsBackdropClick(event: MouseEvent) {
