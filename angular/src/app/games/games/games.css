@@ -796,6 +796,8 @@
 }
 
 .score-table th:first-child {
+  background: #e5e7eb;
+  color: #6b7280;
   text-align: left;
 }
 
@@ -808,8 +810,9 @@
 }
 
 .score-table td:first-child {
+  background: #f3f4f6;
   text-align: left;
-  color: #6b7280;
+  color: #4b5563;
   font-weight: 500;
 }
 
@@ -1431,6 +1434,10 @@
   .score-table td {
     padding: 8px 6px;
     font-size: 1rem;
+  }
+
+  .round-label-full {
+    display: none;
   }
 
   .score-row {
