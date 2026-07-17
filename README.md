@@ -1,7 +1,7 @@
 ## Local Development ##
 
 ### Prerequisites
-- Get the `.env` file from Caleb (contains Supabase credentials)
+- Get the `.env` file from Caleb (only if you want to push to deployed Supabase, you don't need it for local dev)
 - Install `uv`: `pip install uv`
 - Install Angular CLI: `npm install -g @angular/cli`
 - [Install Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started#installing-the-supabase-cli) 
@@ -26,14 +26,25 @@ uv run fastapi dev
 
 ### Local Development Database
 
+You can stand up a local supabase instance, load the schema, and start going ham doing whatever you want
+
 **Initialize Supabase locally:**
 ```bash
-npx supabase init
 npx supabase start
 ```
+This starts a local PostgreSQL database and Supabase instance. You'll see connection details in the output. There's a lot of useful things in that output that you should look at, including the browser URL to manage the supabase instance. Grab the APIs -> Project URL and Authentication Keys -> Secret from the output.
+In the /api directory, create .env and set
+```bash
+SUPABASE_URL="<Project URL>"
+SUPABASE_KEY="<Secret Authentication Key>"
+```
+You also need to create SIGNUP_INVITE_CODE in the .env file. You can set it to anything, you will use that code to make an account in Sheepshead for your local instance
 
-This starts a local PostgreSQL database and Supabase instance. You'll see connection details in the output.
+You should now be set up for local development. Start the web app and start adding data.
 
+
+
+### Connecting to Test and Prod Databases
 **Link to your Supabase project (one-time setup):**
 ```bash
 npx supabase link
