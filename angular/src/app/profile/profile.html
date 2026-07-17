@@ -1,0 +1,99 @@
+<main class="profile-page">
+  <div class="profile-page__header">
+    <button class="btn btn-secondary" routerLink="/">Back to Games</button>
+  </div>
+
+  @if (isLoading()) {
+    <div class="profile-panel">
+      <p class="text-muted">Loading profile...</p>
+    </div>
+  } @else {
+    <section class="profile-panel">
+      <div class="profile-panel__title">
+        <div class="profile-avatar profile-avatar--large">
+          @if (profile()?.avatar_url) {
+            <img [src]="profile()?.avatar_url" alt="" />
+          } @else {
+            <span>{{ fallbackInitials() }}</span>
+          }
+        </div>
+        <div>
+          <h1>Profile</h1>
+          @if (profile()?.claimed_player_name) {
+            <p>Playing as {{ profile()?.claimed_player_name }}</p>
+          } @else {
+            <p>No player claimed</p>
+          }
+        </div>
+      </div>
+
+      @if (errorMessage()) {
+        <p class="profile-message profile-message--error">{{ errorMessage() }}</p>
+      }
+      @if (successMessage()) {
+        <p class="profile-message profile-message--success">{{ successMessage() }}</p>
+      }
+
+      <div class="profile-section">
+        <div class="profile-section__heading">
+          <h2>Picture</h2>
+          <label class="profile-checkbox">
+            <input
+              type="checkbox"
+              [ngModel]="showAvatarOnScoreboard()"
+              (ngModelChange)="showAvatarOnScoreboard.set($event)"
+              name="showAvatarOnScoreboard"
+            />
+            <span>Show on Scoreboard</span>
+          </label>
+        </div>
+        <div class="profile-picture-actions">
+          <label class="btn btn-primary" [class.btn-disabled]="isUploading()">
+            {{ isUploading() ? 'Uploading...' : 'Upload Picture' }}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              (change)="onPictureSelected($event)"
+              [disabled]="isUploading()"
+            />
+          </label>
+          <button class="btn btn-secondary" (click)="deletePicture()" [disabled]="isDeletingPicture() || !profile()?.avatar_url">
+            {{ isDeletingPicture() ? 'Deleting...' : 'Delete Picture' }}
+          </button>
+        </div>
+      </div>
+
+      <form class="profile-form" (ngSubmit)="saveProfile()">
+        <div class="form-group">
+          <label>Username</label>
+          <input class="input" type="text" autocomplete="username" [ngModel]="username()" (ngModelChange)="username.set($event)" name="username" />
+        </div>
+
+        <div class="form-group">
+          <label>Contact Email</label>
+          <input class="input" type="email" autocomplete="email" [ngModel]="contactEmail()" (ngModelChange)="contactEmail.set($event)" name="contactEmail" />
+        </div>
+
+        <div class="profile-grid">
+          <div class="form-group">
+            <label>Scoreboard Initials</label>
+            <input class="input" type="text" maxlength="4" [ngModel]="scoreboardInitials()" (ngModelChange)="scoreboardInitials.set($event)" name="scoreboardInitials" />
+          </div>
+          <div class="form-group">
+            <label>Scoreboard Color</label>
+            <div class="color-row">
+              <input class="color-input" type="color" [ngModel]="scoreboardColor() || '#1A1A2E'" (ngModelChange)="scoreboardColor.set($event)" name="scoreboardColor" />
+              <input class="input" type="text" [ngModel]="scoreboardColor()" (ngModelChange)="scoreboardColor.set($event)" name="scoreboardColorText" />
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-actions">
+          <button class="btn btn-primary" type="submit" [disabled]="isSaving()">
+            {{ isSaving() ? 'Saving...' : 'Save Profile' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  }
+</main>

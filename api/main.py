@@ -1,12 +1,15 @@
 import os
 import re
+import logging
 from dotenv import load_dotenv
 
 from enum import Enum
 from datetime import datetime, timezone
+from uuid import uuid4
 
-from fastapi import FastAPI, Body, Header, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Body, Header, HTTPException, Depends, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from supabase import create_client, Client
 
 class TABLE_NAMES(Enum):
@@ -25,6 +28,20 @@ class ROUND_RESULTS(Enum):
 SYNTHETIC_EMAIL_DOMAIN = "accounts.sheepsheadscores.internal"
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,32}$")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PROFILE_BUCKET = "profile-pictures"
+MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
+INITIALS_PATTERN = re.compile(r"^[A-Z0-9]{1,4}$")
+COLOR_PATTERN = re.compile(r"^#[0-9A-F]{6}$")
+
+logger = logging.getLogger(__name__)
+
+
+class ProfileUpdate(BaseModel):
+    username: str | None = None
+    contact_email: str | None = None
+    scoreboard_initials: str | None = None
+    scoreboard_color: str | None = None
+    show_avatar_on_scoreboard: bool | None = None
 
 
 tags_metadata = [
@@ -78,6 +95,159 @@ def get_current_user_id(authorization: str = Header(None)) -> str:
     if not user_response or not user_response.user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return user_response.user.id
+
+
+def profile_avatar_url(avatar_path: str | None) -> str | None:
+    if not avatar_path:
+        return None
+    try:
+        return supabase.storage.from_(PROFILE_BUCKET).get_public_url(avatar_path)
+    except Exception:
+        logger.exception("Could not generate public profile picture URL for %s", avatar_path)
+        return None
+
+
+def serialize_profile(account: dict) -> dict:
+    claimed_player = account.get(TABLE_NAMES.PLAYERS.value)
+    return {
+        "username": account["username"],
+        "contact_email": account.get("contact_email"),
+        "avatar_url": profile_avatar_url(account.get("avatar_path")),
+        "scoreboard_initials": account.get("scoreboard_initials"),
+        "scoreboard_color": account.get("scoreboard_color"),
+        "show_avatar_on_scoreboard": account.get("show_avatar_on_scoreboard", False),
+        "claimed_player_id": account.get("claimed_player_id"),
+        "claimed_player_name": claimed_player["player_name"] if claimed_player else None,
+    }
+
+
+def load_profile(user_id: str) -> dict:
+    account_response = (
+        supabase.table(TABLE_NAMES.ACCOUNTS.value)
+        .select(f"username, contact_email, avatar_path, scoreboard_initials, scoreboard_color, show_avatar_on_scoreboard, claimed_player_id, {TABLE_NAMES.PLAYERS.value}(player_name)")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not account_response.data:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return account_response.data[0]
+
+
+def validate_profile_update(payload: ProfileUpdate, user_id: str) -> dict:
+    supplied_fields = payload.model_fields_set
+    if not supplied_fields:
+        raise HTTPException(status_code=400, detail="Profile update cannot be empty")
+
+    update: dict = {}
+
+    if "username" in supplied_fields:
+        username = payload.username.strip() if payload.username is not None else ""
+        if not username:
+            raise HTTPException(status_code=400, detail="Username is required")
+        if not USERNAME_PATTERN.match(username):
+            raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, periods, hyphens, and underscores (no spaces)")
+
+        existing = (
+            supabase.table(TABLE_NAMES.ACCOUNTS.value)
+            .select("user_id")
+            .ilike("username", username)
+            .neq("user_id", user_id)
+            .execute()
+        )
+        if existing.data:
+            raise HTTPException(status_code=409, detail="Username is already taken")
+        update["username"] = username
+
+    if "contact_email" in supplied_fields:
+        contact_email = payload.contact_email.strip() if payload.contact_email is not None else ""
+        if not contact_email:
+            update["contact_email"] = None
+        elif not EMAIL_PATTERN.match(contact_email):
+            raise HTTPException(status_code=400, detail="Invalid email address")
+        else:
+            update["contact_email"] = contact_email
+
+    if "scoreboard_initials" in supplied_fields:
+        initials = payload.scoreboard_initials.strip().upper() if payload.scoreboard_initials is not None else ""
+        if not initials:
+            update["scoreboard_initials"] = None
+        elif not INITIALS_PATTERN.match(initials):
+            raise HTTPException(status_code=400, detail="Scoreboard initials must be 1-4 letters or digits")
+        else:
+            update["scoreboard_initials"] = initials
+
+    if "scoreboard_color" in supplied_fields:
+        color = payload.scoreboard_color.strip().upper() if payload.scoreboard_color is not None else ""
+        if not color:
+            update["scoreboard_color"] = None
+        elif not COLOR_PATTERN.match(color):
+            raise HTTPException(status_code=400, detail="Scoreboard color must be a hex color like #667EEA")
+        else:
+            update["scoreboard_color"] = color
+
+    if "show_avatar_on_scoreboard" in supplied_fields:
+        update["show_avatar_on_scoreboard"] = bool(payload.show_avatar_on_scoreboard)
+
+    if not update:
+        raise HTTPException(status_code=400, detail="Profile update cannot be empty")
+    return update
+
+
+def detect_image_type(data: bytes, declared_content_type: str | None) -> tuple[str, str]:
+    content_type = (declared_content_type or "").split(";")[0].strip().lower()
+    allowed_content_types = {"image/jpeg", "image/png", "image/webp"}
+    if content_type not in allowed_content_types:
+        raise HTTPException(status_code=415, detail="Unsupported profile picture type")
+
+    detected: tuple[str, str] | None = None
+    if data.startswith(b"\xff\xd8\xff"):
+        detected = ("image/jpeg", "jpg")
+    elif data.startswith(b"\x89PNG\r\n\x1a\n"):
+        detected = ("image/png", "png")
+    elif len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        detected = ("image/webp", "webp")
+
+    if detected is None or detected[0] != content_type:
+        raise HTTPException(status_code=415, detail="Unsupported profile picture type")
+    return detected
+
+
+def delete_profile_picture_object(path: str | None) -> None:
+    if not path:
+        return
+    try:
+        supabase.storage.from_(PROFILE_BUCKET).remove([path])
+    except Exception:
+        logger.exception("Could not delete profile picture object %s", path)
+
+
+def get_scoreboard_preferences(player_ids: set[int]) -> dict[int, dict]:
+    if not player_ids:
+        return {}
+    response = (
+        supabase.table(TABLE_NAMES.ACCOUNTS.value)
+        .select("claimed_player_id, scoreboard_initials, scoreboard_color, avatar_path, show_avatar_on_scoreboard")
+        .in_("claimed_player_id", list(player_ids))
+        .execute()
+    )
+    return {
+        row["claimed_player_id"]: {
+            "scoreboard_initials": row.get("scoreboard_initials"),
+            "scoreboard_color": row.get("scoreboard_color"),
+            "scoreboard_avatar_url": profile_avatar_url(row.get("avatar_path")) if row.get("show_avatar_on_scoreboard") else None,
+        }
+        for row in response.data
+        if row.get("claimed_player_id") is not None
+    }
+
+
+def enrich_players_with_scoreboard_preferences(players: list[dict]) -> None:
+    preferences = get_scoreboard_preferences({player["player_id"] for player in players})
+    for player in players:
+        preference = preferences.get(player["player_id"], {})
+        player["scoreboard_initials"] = preference.get("scoreboard_initials")
+        player["scoreboard_color"] = preference.get("scoreboard_color")
+        player["scoreboard_avatar_url"] = preference.get("scoreboard_avatar_url")
 
 
 class GameConnectionManager:
@@ -161,6 +331,24 @@ def get_games():
         .order("game_datetime", desc=True)
         .execute()
     )
+    player_ids: set[int] = set()
+    for game in response.data:
+        for player_game in game.get(TABLE_NAMES.PLAYERSXGAMES.value, []):
+            player = player_game.get(TABLE_NAMES.PLAYERS.value)
+            if player:
+                player_ids.add(player["player_id"])
+
+    preferences = get_scoreboard_preferences(player_ids)
+    for game in response.data:
+        for player_game in game.get(TABLE_NAMES.PLAYERSXGAMES.value, []):
+            player = player_game.get(TABLE_NAMES.PLAYERS.value)
+            if not player:
+                continue
+            preference = preferences.get(player["player_id"], {})
+            player["scoreboard_initials"] = preference.get("scoreboard_initials")
+            player["scoreboard_color"] = preference.get("scoreboard_color")
+            player["scoreboard_avatar_url"] = preference.get("scoreboard_avatar_url")
+
     return response.data
 
 @app.post("/games", tags=["Game Management"])
@@ -353,6 +541,7 @@ def get_players():
         .select()
         .execute()
     )
+    enrich_players_with_scoreboard_preferences(response.data)
     return response.data
 
 @app.post("/players", tags=["Player Management"])
@@ -362,10 +551,14 @@ def create_player(player_name: str, user_id: str = Depends(get_current_user_id))
         .insert({"player_name": player_name})
         .execute()
     )
-    return response.data[0]
+    player = response.data[0]
+    player["scoreboard_initials"] = None
+    player["scoreboard_color"] = None
+    player["scoreboard_avatar_url"] = None
+    return player
 
 @app.post("/players/{player_id}/claim", tags=["Player Management"])
-def claim_player(player_id: int, user_id: str = Depends(get_current_user_id)):
+async def claim_player(player_id: int, user_id: str = Depends(get_current_user_id)):
     player_lookup = (
         supabase.table(TABLE_NAMES.PLAYERS.value)
         .select("player_id")
@@ -401,10 +594,11 @@ def claim_player(player_id: int, user_id: str = Depends(get_current_user_id)):
         .eq("user_id", user_id)
         .execute()
     )
+    await game_connections.broadcast_list()
     return response.data[0]
 
 @app.post("/players/{player_id}/unclaim", tags=["Player Management"])
-def unclaim_player(player_id: int, user_id: str = Depends(get_current_user_id)):
+async def unclaim_player(player_id: int, user_id: str = Depends(get_current_user_id)):
     current_account = (
         supabase.table(TABLE_NAMES.ACCOUNTS.value)
         .select("claimed_player_id")
@@ -420,7 +614,102 @@ def unclaim_player(player_id: int, user_id: str = Depends(get_current_user_id)):
         .eq("user_id", user_id)
         .execute()
     )
+    await game_connections.broadcast_list()
     return response.data[0]
+
+@app.get("/auth/profile", tags=["Auth"])
+def get_profile(user_id: str = Depends(get_current_user_id)):
+    return serialize_profile(load_profile(user_id))
+
+@app.patch("/auth/profile", tags=["Auth"])
+async def update_profile(payload: ProfileUpdate, user_id: str = Depends(get_current_user_id)):
+    existing_profile = load_profile(user_id)
+    update = validate_profile_update(payload, user_id)
+
+    try:
+        response = (
+            supabase.table(TABLE_NAMES.ACCOUNTS.value)
+            .update(update)
+            .eq("user_id", user_id)
+            .execute()
+        )
+    except Exception as e:
+        message = str(e)
+        if "Accounts_username_lower_idx" in message or "duplicate key" in message.lower() or "unique" in message.lower():
+            raise HTTPException(status_code=409, detail="Username is already taken")
+        raise
+
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    preference_changed = any(
+        field in update and update[field] != existing_profile.get(field)
+        for field in ("scoreboard_initials", "scoreboard_color", "show_avatar_on_scoreboard")
+    )
+    if preference_changed:
+        await game_connections.broadcast_list()
+
+    return serialize_profile(load_profile(user_id))
+
+@app.post("/auth/profile/picture", tags=["Auth"])
+async def upload_profile_picture(file: UploadFile = File(...), user_id: str = Depends(get_current_user_id)):
+    data = await file.read(MAX_PROFILE_PICTURE_BYTES + 1)
+    if not data:
+        raise HTTPException(status_code=400, detail="Profile picture file is empty")
+    if len(data) > MAX_PROFILE_PICTURE_BYTES:
+        raise HTTPException(status_code=413, detail="Profile picture must be 2 MiB or smaller")
+
+    content_type, extension = detect_image_type(data, file.content_type)
+    current_profile = load_profile(user_id)
+    old_avatar_path = current_profile.get("avatar_path")
+    new_avatar_path = f"{user_id}/{uuid4()}.{extension}"
+
+    try:
+        supabase.storage.from_(PROFILE_BUCKET).upload(
+            new_avatar_path,
+            data,
+            file_options={"content-type": content_type, "upsert": "false"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not upload profile picture: {e}")
+
+    try:
+        response = (
+            supabase.table(TABLE_NAMES.ACCOUNTS.value)
+            .update({"avatar_path": new_avatar_path})
+            .eq("user_id", user_id)
+            .execute()
+        )
+    except Exception:
+        delete_profile_picture_object(new_avatar_path)
+        raise
+
+    if not response.data:
+        delete_profile_picture_object(new_avatar_path)
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    delete_profile_picture_object(old_avatar_path)
+    if current_profile.get("show_avatar_on_scoreboard"):
+        await game_connections.broadcast_list()
+    return serialize_profile(load_profile(user_id))
+
+@app.delete("/auth/profile/picture", tags=["Auth"])
+async def delete_profile_picture(user_id: str = Depends(get_current_user_id)):
+    current_profile = load_profile(user_id)
+    old_avatar_path = current_profile.get("avatar_path")
+    response = (
+        supabase.table(TABLE_NAMES.ACCOUNTS.value)
+        .update({"avatar_path": None})
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    delete_profile_picture_object(old_avatar_path)
+    if current_profile.get("show_avatar_on_scoreboard"):
+        await game_connections.broadcast_list()
+    return serialize_profile(load_profile(user_id))
 
 @app.post("/auth/signup", tags=["Auth"])
 def signup(username: str = Body(...), password: str = Body(...), invite_code: str = Body(...), email: str | None = Body(None)):
@@ -472,13 +761,12 @@ def signup(username: str = Body(...), password: str = Body(...), invite_code: st
         raise HTTPException(status_code=500, detail="Account created, but automatic sign-in failed — please log in")
 
     session = sign_in_response.session
+    profile = serialize_profile(account)
     return {
         "access_token": session.access_token,
         "refresh_token": session.refresh_token,
         "expires_at": session.expires_at,
-        "username": account["username"],
-        "claimed_player_id": account["claimed_player_id"],
-        "claimed_player_name": None,
+        **profile,
     }
 
 @app.post("/auth/login", tags=["Auth"])
@@ -505,14 +793,12 @@ def login(username: str = Body(...), password: str = Body(...)):
     if not session:
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    claimed_player = account.get(TABLE_NAMES.PLAYERS.value)
+    profile = serialize_profile(account)
     return {
         "access_token": session.access_token,
         "refresh_token": session.refresh_token,
         "expires_at": session.expires_at,
-        "username": account["username"],
-        "claimed_player_id": account["claimed_player_id"],
-        "claimed_player_name": claimed_player["player_name"] if claimed_player else None,
+        **profile,
     }
 
 @app.post("/auth/refresh", tags=["Auth"])
@@ -543,18 +829,4 @@ def logout(authorization: str = Header(None), user_id: str = Depends(get_current
 
 @app.get("/auth/me", tags=["Auth"])
 def get_me(user_id: str = Depends(get_current_user_id)):
-    account_response = (
-        supabase.table(TABLE_NAMES.ACCOUNTS.value)
-        .select(f"username, claimed_player_id, {TABLE_NAMES.PLAYERS.value}(player_name)")
-        .eq("user_id", user_id)
-        .execute()
-    )
-    if not account_response.data:
-        raise HTTPException(status_code=404, detail="Account not found")
-    account = account_response.data[0]
-    claimed_player = account.get(TABLE_NAMES.PLAYERS.value)
-    return {
-        "username": account["username"],
-        "claimed_player_id": account["claimed_player_id"],
-        "claimed_player_name": claimed_player["player_name"] if claimed_player else None,
-    }
+    return serialize_profile(load_profile(user_id))

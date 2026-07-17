@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { catchError, finalize, Observable, switchMap, tap, throwError } from 'rxjs';
 
 import { environment } from '../../environments/environment';
-import { AccountInfo, AuthSession, RefreshedTokens } from '../interfaces/auth';
+import { AccountInfo, AuthSession, ProfileInfo, ProfileUpdate, RefreshedTokens } from '../interfaces/auth';
 import { TokenStore } from './token-store';
 
 @Injectable({
@@ -17,6 +17,11 @@ export class AuthService {
   refreshToken = this.tokenStore.refreshToken
   expiresAt = this.tokenStore.expiresAt
   username = this.tokenStore.username
+  contactEmail = this.tokenStore.contactEmail
+  avatarUrl = this.tokenStore.avatarUrl
+  scoreboardInitials = this.tokenStore.scoreboardInitials
+  scoreboardColor = this.tokenStore.scoreboardColor
+  showAvatarOnScoreboard = this.tokenStore.showAvatarOnScoreboard
   claimedPlayerId = this.tokenStore.claimedPlayerId
   claimedPlayerName = this.tokenStore.claimedPlayerName
   isAuthenticated = this.tokenStore.isAuthenticated
@@ -70,7 +75,33 @@ export class AuthService {
 
   refreshMe(): Observable<AccountInfo> {
     return this.http.get<AccountInfo>(`${environment.apiUrl}/${environment.auth}/me`).pipe(
-      tap(info => this.tokenStore.setAccountInfo(info.username, info.claimed_player_id, info.claimed_player_name))
+      tap(info => this.applyProfile(info))
+    )
+  }
+
+  getProfile(): Observable<ProfileInfo> {
+    return this.http.get<ProfileInfo>(`${environment.apiUrl}/${environment.auth}/profile`).pipe(
+      tap(info => this.applyProfile(info))
+    )
+  }
+
+  updateProfile(update: ProfileUpdate): Observable<ProfileInfo> {
+    return this.http.patch<ProfileInfo>(`${environment.apiUrl}/${environment.auth}/profile`, update).pipe(
+      tap(info => this.applyProfile(info))
+    )
+  }
+
+  uploadProfilePicture(file: File): Observable<ProfileInfo> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return this.http.post<ProfileInfo>(`${environment.apiUrl}/${environment.auth}/profile/picture`, formData).pipe(
+      tap(info => this.applyProfile(info))
+    )
+  }
+
+  deleteProfilePicture(): Observable<ProfileInfo> {
+    return this.http.delete<ProfileInfo>(`${environment.apiUrl}/${environment.auth}/profile/picture`).pipe(
+      tap(info => this.applyProfile(info))
     )
   }
 
@@ -88,6 +119,10 @@ export class AuthService {
 
   private applySession(session: AuthSession) {
     this.tokenStore.persistTokens(session.access_token, session.refresh_token, session.expires_at)
-    this.tokenStore.setAccountInfo(session.username, session.claimed_player_id, session.claimed_player_name)
+    this.applyProfile(session)
+  }
+
+  private applyProfile(info: ProfileInfo) {
+    this.tokenStore.setAccountInfo(info)
   }
 }

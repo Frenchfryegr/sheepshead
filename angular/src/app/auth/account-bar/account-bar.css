@@ -15,6 +15,45 @@
   color: #1a1a2e;
 }
 
+.account-bar__profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #1a1a2e;
+  cursor: pointer;
+  padding: 4px 10px 4px 4px;
+  min-width: 0;
+}
+
+.account-bar__profile:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.14);
+}
+
+.account-bar__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e5e7eb;
+  color: #1a1a2e;
+  font-size: 0.78rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.account-bar__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .account-bar__link {
   background: none;
   border: none;

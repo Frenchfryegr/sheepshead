@@ -790,13 +790,13 @@ export class Games implements AfterViewInit {
 
   private sortPlayersByInitials(players: Player[]): Player[] {
     return [...players].sort((a, b) => {
-      const initialsCompare = this.getBaseInitials(a.player_name).localeCompare(this.getBaseInitials(b.player_name))
+      const initialsCompare = this.getEffectiveInitials(a).localeCompare(this.getEffectiveInitials(b))
       return initialsCompare !== 0 ? initialsCompare : a.player_name.localeCompare(b.player_name)
     })
   }
 
   private computePlayerInitials(players: Player[]): Map<number, string> {
-    const baseInitials = players.map(p => this.getBaseInitials(p.player_name))
+    const baseInitials = players.map(p => this.getEffectiveInitials(p))
     const totalCounts = new Map<string, number>()
     for (const initials of baseInitials) {
       totalCounts.set(initials, (totalCounts.get(initials) ?? 0) + 1)
@@ -815,6 +815,26 @@ export class Games implements AfterViewInit {
       }
     })
     return result
+  }
+
+  private getEffectiveInitials(player: Player): string {
+    return player.scoreboard_initials ?? this.getBaseInitials(player.player_name)
+  }
+
+  scoreboardColor(player: Player): string {
+    return player.scoreboard_color ?? '#1A1A2E'
+  }
+
+  scoreboardTextColor(player: Player): '#000000' | '#FFFFFF' {
+    const color = this.scoreboardColor(player)
+    const red = parseInt(color.slice(1, 3), 16) / 255
+    const green = parseInt(color.slice(3, 5), 16) / 255
+    const blue = parseInt(color.slice(5, 7), 16) / 255
+    const linear = [red, green, blue].map(channel => (
+      channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4)
+    ))
+    const luminance = (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2])
+    return luminance > 0.179 ? '#000000' : '#FFFFFF'
   }
 
   private getBaseInitials(name: string): string {

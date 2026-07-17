@@ -1,6 +1,8 @@
 import { computed, Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 
+import { ProfileInfo } from '../interfaces/auth';
+
 const STORAGE_KEY = 'sheepshead_auth';
 
 interface StoredTokens {
@@ -23,6 +25,11 @@ export class TokenStore {
   refreshToken = signal<string | null>(null)
   expiresAt = signal<number | null>(null)
   username = signal<string | null>(null)
+  contactEmail = signal<string | null>(null)
+  avatarUrl = signal<string | null>(null)
+  scoreboardInitials = signal<string | null>(null)
+  scoreboardColor = signal<string | null>(null)
+  showAvatarOnScoreboard = signal(false)
   claimedPlayerId = signal<number | null>(null)
   claimedPlayerName = signal<string | null>(null)
 
@@ -43,10 +50,15 @@ export class TokenStore {
     }
   }
 
-  setAccountInfo(username: string, claimedPlayerId: number | null, claimedPlayerName: string | null) {
-    this.username.set(username)
-    this.claimedPlayerId.set(claimedPlayerId)
-    this.claimedPlayerName.set(claimedPlayerName)
+  setAccountInfo(info: ProfileInfo) {
+    this.username.set(info.username)
+    this.contactEmail.set(info.contact_email)
+    this.avatarUrl.set(info.avatar_url)
+    this.scoreboardInitials.set(info.scoreboard_initials)
+    this.scoreboardColor.set(info.scoreboard_color)
+    this.showAvatarOnScoreboard.set(info.show_avatar_on_scoreboard)
+    this.claimedPlayerId.set(info.claimed_player_id)
+    this.claimedPlayerName.set(info.claimed_player_name)
   }
 
   clear() {
@@ -54,6 +66,11 @@ export class TokenStore {
     this.refreshToken.set(null)
     this.expiresAt.set(null)
     this.username.set(null)
+    this.contactEmail.set(null)
+    this.avatarUrl.set(null)
+    this.scoreboardInitials.set(null)
+    this.scoreboardColor.set(null)
+    this.showAvatarOnScoreboard.set(false)
     this.claimedPlayerId.set(null)
     this.claimedPlayerName.set(null)
     if (this.isBrowser) {

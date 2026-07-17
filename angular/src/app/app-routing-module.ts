@@ -1,7 +1,15 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
-const routes: Routes = [];
+import { profileGuard } from './auth/profile.guard';
+import { Games } from './games/games/games';
+import { Profile } from './profile/profile';
+
+const routes: Routes = [
+  { path: '', component: Games },
+  { path: 'profile', component: Profile, canActivate: [profileGuard] },
+  { path: '**', redirectTo: '' },
+];
 
 @NgModule({
   imports: [RouterModule.forRoot(routes)],

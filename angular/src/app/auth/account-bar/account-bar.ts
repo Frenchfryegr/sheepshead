@@ -1,4 +1,5 @@
 import { AfterViewInit, Component, ElementRef, inject, signal, ViewChild } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { AuthService } from '../auth-service';
 import { GamesService } from '../../games/games-service';
@@ -15,6 +16,7 @@ type AuthMode = 'login' | 'signup';
 export class AccountBar implements AfterViewInit {
   protected authService = inject(AuthService)
   private gamesService = inject(GamesService)
+  private router = inject(Router)
   private savedScrollY = 0
 
   @ViewChild('AuthDialog') authDialog!: ElementRef<HTMLDialogElement>
@@ -108,7 +110,22 @@ export class AccountBar implements AfterViewInit {
   }
 
   logout() {
-    this.authService.logout().subscribe()
+    this.authService.logout().subscribe({
+      next: () => this.router.navigate(['/']),
+      error: () => this.router.navigate(['/']),
+    })
+  }
+
+  openProfile() {
+    this.router.navigate(['/profile'])
+  }
+
+  profileFallback(): string {
+    const username = this.authService.username()?.trim() || '?'
+    const tokens = username.split(/\s+/).filter(Boolean)
+    if (tokens.length === 0) return '?'
+    if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase()
+    return (tokens[0][0] + tokens[tokens.length - 1][0]).toUpperCase()
   }
 
   openClaimDialog() {
