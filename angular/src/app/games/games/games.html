@@ -143,11 +143,11 @@
       @if (selectedGameScoreTable().rows.length > 0) {
         <div class="form-group">
           <label class="scoreboard-label">Scoreboard</label>
-          <div #ActiveScoreboardWrapper class="table-wrapper score-table-wrapper">
+          <div class="table-wrapper score-table-wrapper">
             <table class="score-table">
               <thead>
                 <tr>
-                  <th>Round</th>
+                  <th><span class="round-label-full">Round</span></th>
                   @for (player of selectedGameScoreTable().players; track player.player_id) {
                     <th
                       class="initials-header"
@@ -514,11 +514,11 @@
       <div class="form-group scoreboard-form-group" [class.mobile-hidden-when-summary]="addRoundFormOpen()">
         @if (activeScoreTable().rows.length > 0) {
           <label class="scoreboard-label">Scoreboard</label>
-          <div class="table-wrapper score-table-wrapper">
+          <div #ActiveScoreboardWrapper class="table-wrapper score-table-wrapper">
             <table class="score-table">
               <thead>
                 <tr>
-                  <th>Round</th>
+                  <th><span class="round-label-full">Round</span></th>
                   @for (player of activeScoreTable().players; track player.player_id) {
                     <th
                       class="initials-header"
