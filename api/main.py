@@ -268,6 +268,13 @@ ACHIEVEMENT_DEFS: list[AchievementDef] = [
         metric=lambda stats: float(stats["no_trick_lone_wins"]),
         tiers=(AchievementTier("gold", 1),),
     ),
+    AchievementDef(
+        key="screwed_over",
+        title="Screwed Over",
+        description="Be the partner when the picker loses with no schneider",
+        metric=lambda stats: float(stats["partner_screwed_count"]),
+        tiers=(AchievementTier("gold", 1),),
+    ),
 ]
 
 
@@ -623,6 +630,7 @@ def _empty_stats(player_id: int) -> dict:
         "overconfident_count": 0,
         "overconfident_last_created": None,
         "punching_bag_count": 0,
+        "partner_screwed_count": 0,
         "icarus_max_lead": 0,
         "icarus_final_score": 0,
         "games_won": 0,
@@ -708,6 +716,7 @@ def aggregate_player_stats() -> dict[int, dict]:
                         split_bucket["rounds_won"] += 1
                     if no_schneider and is_picker_loss:
                         stats_for_player["punching_bag_count"] += 1
+                        stats_for_player["partner_screwed_count"] += 1
                 elif role == "Opponent":
                     stats_for_player["big_loser_rounds_played"] += 1
                     split_bucket["rounds_played"] += 1
