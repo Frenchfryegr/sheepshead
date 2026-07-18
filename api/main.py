@@ -163,7 +163,7 @@ BADGE_DEFS: list[BadgeDef] = [
         title="Biggest Loser",
         description="Lowest Game win %",
         value=lambda stats: stats["games_won"] / stats["games_played"],
-        eligible=lambda stats: stats["games_played"] >= 3,
+        eligible=lambda stats: stats["games_won"] >= 1,
         tiebreak_sample=lambda stats: stats["games_played"],
         format=_pct,
         lower_is_better=True,
