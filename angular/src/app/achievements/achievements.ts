@@ -1,8 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { AchievementsService } from './achievements-service';
 import { AuthService } from '../auth/auth-service';
+import { ShowOnlyMeStore } from '../shared/show-only-me-store';
 import { AchievementEarner } from '../interfaces/achievement';
 
 @Component({
@@ -15,7 +16,7 @@ export class Achievements implements OnInit {
   private achievementsService = inject(AchievementsService)
   private authService = inject(AuthService)
   private route = inject(ActivatedRoute)
-  private router = inject(Router)
+  private onlyMeStore = inject(ShowOnlyMeStore)
 
   // Read directly from AchievementsService's cache (not a local copy) so the last-known
   // list survives this component being destroyed and recreated on route navigation.
@@ -23,9 +24,10 @@ export class Achievements implements OnInit {
   isLoading = signal(this.achievements().length === 0)
   searchQuery = signal('')
 
-  // "Show only me" is on by default; a ?showOnlyMe=false query param (read in ngOnInit,
-  // written on toggle) overrides it so a shared big-screen URL survives refresh.
-  showOnlyMe = signal(true)
+  // "Show only me" is on by default. State lives in a shared store so it persists while
+  // navigating between badges/achievements/stats, and resets on a full reload. A
+  // ?showOnlyMe=true|false query param (read in ngOnInit) still overrides it on load.
+  showOnlyMe = this.onlyMeStore.value
   canFilterToMe = computed(() => this.authService.isAuthenticated() && this.authService.claimedPlayerId() != null)
   onlyMe = computed(() => this.showOnlyMe() && this.canFilterToMe())
 
@@ -52,8 +54,8 @@ export class Achievements implements OnInit {
 
   ngOnInit() {
     const param = this.route.snapshot.queryParamMap.get('showOnlyMe')
-    if (param === 'false') this.showOnlyMe.set(false)
-    else if (param === 'true') this.showOnlyMe.set(true)
+    if (param === 'false') this.onlyMeStore.set(false)
+    else if (param === 'true') this.onlyMeStore.set(true)
 
     this.achievementsService.getAchievements().subscribe({
       next: achievements => {
@@ -65,13 +67,7 @@ export class Achievements implements OnInit {
   }
 
   toggleOnlyMe(value: boolean) {
-    this.showOnlyMe.set(value)
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { showOnlyMe: value },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    })
+    this.onlyMeStore.set(value)
   }
 
   emptyMessage(): string {

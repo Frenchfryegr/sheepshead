@@ -276,6 +276,14 @@
   white-space: nowrap;
 }
 
+.dialog-header__latest {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #667eea;
+}
+
 .dialog-wizard .dialog-header h2 {
   font-size: 1.6rem;
 }

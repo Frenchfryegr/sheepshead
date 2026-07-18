@@ -10,6 +10,7 @@ import { Statistics } from './statistics/statistics';
 
 const routes: Routes = [
   { path: '', component: Games },
+  { path: 'latest', component: Games, data: { openLatest: true } },
   { path: 'profile', component: Profile, canActivate: [profileGuard] },
   { path: 'badges', component: Badges },
   { path: 'achievements', component: Achievements },
