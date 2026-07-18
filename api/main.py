@@ -22,6 +22,7 @@ class TABLE_NAMES(Enum):
     ROUNDS = "Rounds"
     ACCOUNTS = "Accounts"
     BADGES = "Badges"
+    PLAYER_ACHIEVEMENTS = "PlayerAchievements"
 
 class ROUND_RESULTS(Enum):
     PICKER_WIN = "Picker Win"
@@ -193,6 +194,83 @@ BADGE_DEFS: list[BadgeDef] = [
 ]
 
 
+ACHIEVEMENT_TIERS = ("bronze", "silver", "gold")  # canonical order, low -> high
+
+
+@dataclass(frozen=True)
+class AchievementTier:
+    tier: str  # one of ACHIEVEMENT_TIERS
+    threshold: float  # metric value required (metric >= threshold earns it)
+
+
+@dataclass(frozen=True)
+class AchievementDef:
+    key: str
+    title: str
+    description: str
+    # Reads the SAME per-player stats dict that aggregate_player_stats() builds for badges.
+    metric: Callable[[dict], float]
+    # Ascending thresholds, tier names in bronze -> silver -> gold order. A one-shot
+    # achievement declares a single gold tier.
+    tiers: tuple[AchievementTier, ...]
+    format: Callable[[float], str] = _count
+
+
+ACHIEVEMENT_DEFS: list[AchievementDef] = [
+    AchievementDef(
+        key="picker_champion",
+        title="The People's Champion",
+        description="Win rounds as the picker",
+        metric=lambda stats: float(stats["picker_wins"]),
+        tiers=(
+            AchievementTier("bronze", 5),
+            AchievementTier("silver", 25),
+            AchievementTier("gold", 100),
+        ),
+    ),
+    AchievementDef(
+        key="leaster_legend",
+        title="The Least Of Us",
+        description="Win leaster rounds",
+        metric=lambda stats: float(stats["leaster_wins"]),
+        tiers=(
+            AchievementTier("bronze", 3),
+            AchievementTier("silver", 10),
+            AchievementTier("gold", 30),
+        ),
+    ),
+    AchievementDef(
+        key="table_regular",
+        title="Honorary Cheesehead",
+        description="Play completed games",
+        metric=lambda stats: float(stats["games_played"]),
+        tiers=(
+            AchievementTier("bronze", 10),
+            AchievementTier("silver", 50),
+            AchievementTier("gold", 150),
+        ),
+    ),
+    AchievementDef(
+        key="game_winner",
+        title="Good At The Game",
+        description="Win games",
+        metric=lambda stats: float(stats["games_won"]),
+        tiers=(
+            AchievementTier("bronze", 3),
+            AchievementTier("silver", 15),
+            AchievementTier("gold", 50),
+        ),
+    ),
+    AchievementDef(
+        key="perfect_solo",
+        title="\"I Don\'t Need No Man\"",
+        description="Go alone and win a no-trick round",
+        metric=lambda stats: float(stats["no_trick_lone_wins"]),
+        tiers=(AchievementTier("gold", 1),),
+    ),
+]
+
+
 class ProfileUpdate(BaseModel):
     username: str | None = None
     contact_email: str | None = None
@@ -207,6 +285,7 @@ tags_metadata = [
     {"name": "Player Management", "description": "do stuff to da playas"},
     {"name": "Auth", "description": "accounts, login, and player claiming"},
     {"name": "Badge Management", "description": "badge standings"},
+    {"name": "Achievement Management", "description": "milestone achievements"},
 
 ]
 
@@ -429,6 +508,8 @@ def _empty_stats(player_id: int) -> dict:
         "worst_lost_score": None,
         "big_loser_rounds_played": 0,
         "big_loser_rounds_won": 0,
+        "leaster_wins": 0,
+        "no_trick_lone_wins": 0,
     }
 
 
@@ -437,7 +518,7 @@ def aggregate_player_stats() -> dict[int, dict]:
         supabase.table(TABLE_NAMES.GAMES.value)
         .select(
             f"game_id, {TABLE_NAMES.PLAYERSXGAMES.value}(player_id), "
-            f"{TABLE_NAMES.ROUNDS.value}(round_number, round_result, no_schneider, no_partner, created, "
+            f"{TABLE_NAMES.ROUNDS.value}(round_number, round_result, no_schneider, no_partner, no_trick, created, "
             f"{TABLE_NAMES.PLAYERROUNDSCORE.value}(player_id, player_role, point_delta))"
         )
         .eq("is_completed", True)
@@ -460,6 +541,7 @@ def aggregate_player_stats() -> dict[int, dict]:
             is_picker_loss = round_result == ROUND_RESULTS.PICKER_LOSS.value
             no_schneider = bool(round_row.get("no_schneider"))
             no_partner = bool(round_row.get("no_partner"))
+            no_trick = bool(round_row.get("no_trick"))
             round_created = round_row.get("created")
             for player_score in round_row.get(TABLE_NAMES.PLAYERROUNDSCORE.value, []):
                 role = player_score.get("player_role")
@@ -476,6 +558,8 @@ def aggregate_player_stats() -> dict[int, dict]:
                         stats_for_player["punching_bag_count"] += 1
                     if no_partner:
                         stats_for_player["lone_wolf_count"] += 1
+                        if is_picker_win and no_trick:
+                            stats_for_player["no_trick_lone_wins"] += 1
                         if is_picker_loss:
                             stats_for_player["overconfident_count"] += 1
                             last_created = stats_for_player["overconfident_last_created"]
@@ -498,6 +582,7 @@ def aggregate_player_stats() -> dict[int, dict]:
                 elif role == "Leaster Winner":
                     stats_for_player["big_loser_rounds_played"] += 1
                     stats_for_player["big_loser_rounds_won"] += 1
+                    stats_for_player["leaster_wins"] += 1
                 elif role == "Leaster Loser":
                     stats_for_player["big_loser_rounds_played"] += 1
 
@@ -585,9 +670,8 @@ def _select_holder(badge: BadgeDef, stats: dict[int, dict]) -> dict | None:
     )
 
 
-def recompute_badges() -> None:
+def recompute_badges(stats: dict[int, dict]) -> None:
     try:
-        stats = aggregate_player_stats()
         updated_at = datetime.now(timezone.utc).isoformat()
         rows = []
         for badge in BADGE_DEFS:
@@ -616,6 +700,43 @@ def recompute_badges() -> None:
         logger.exception("recompute_badges failed")
 
 
+def recompute_achievements(stats: dict[int, dict]) -> None:
+    # Sticky: rows are only ever inserted (ignore_duplicates preserves the original
+    # earned_at), never updated or deleted — an earned tier survives later data edits.
+    try:
+        earned_at = datetime.now(timezone.utc).isoformat()
+        rows = []
+        for achievement in ACHIEVEMENT_DEFS:
+            for player_stats in stats.values():
+                value = achievement.metric(player_stats)
+                for tier_def in achievement.tiers:
+                    if value >= tier_def.threshold:
+                        rows.append({
+                            "player_id": player_stats["player_id"],
+                            "achievement_key": achievement.key,
+                            "tier": tier_def.tier,
+                            "earned_at": earned_at,
+                        })
+        if rows:
+            supabase.table(TABLE_NAMES.PLAYER_ACHIEVEMENTS.value).upsert(
+                rows,
+                on_conflict="player_id,achievement_key,tier",
+                ignore_duplicates=True,
+            ).execute()
+    except Exception:
+        logger.exception("recompute_achievements failed")
+
+
+def recompute_standings() -> None:
+    try:
+        stats = aggregate_player_stats()
+    except Exception:
+        logger.exception("aggregate_player_stats failed")
+        return
+    recompute_badges(stats)
+    recompute_achievements(stats)
+
+
 def _game_is_completed(game_id: int) -> bool:
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
@@ -627,8 +748,8 @@ def _game_is_completed(game_id: int) -> bool:
 
 
 @app.on_event("startup")
-def _seed_badges_on_startup():
-    recompute_badges()
+def _seed_standings_on_startup():
+    recompute_standings()
 
 
 class GameConnectionManager:
@@ -772,7 +893,7 @@ async def delete_game(game_id, user_id: str = Depends(get_current_user_id)):
         .execute()
     )
     await game_connections.broadcast_list()
-    recompute_badges()
+    recompute_standings()
     return response.data
 
 @app.patch("/games/{game_id}/status", tags=["Game Management"])
@@ -785,7 +906,7 @@ async def set_game_status(game_id, is_completed: bool = Body(..., embed=True), u
     )
     await game_connections.broadcast(int(game_id))
     await game_connections.broadcast_list()
-    recompute_badges()
+    recompute_standings()
     return response.data[0]
 
 @app.patch("/games/{game_id}/name", tags=["Game Management"])
@@ -811,7 +932,7 @@ async def complete_game(game_id, user_id: str = Depends(get_current_user_id)):
     )
     await game_connections.broadcast(int(game_id))
     await game_connections.broadcast_list()
-    recompute_badges()
+    recompute_standings()
     return response.data[0]
 
 @app.get("/rounds/{game_id}", tags=["Game Management"])
@@ -852,7 +973,7 @@ async def create_round(
     await game_connections.broadcast(game_id)
     await game_connections.broadcast_list()
     if _game_is_completed(game_id):
-        recompute_badges()
+        recompute_standings()
     return created_round
 
 @app.patch("/rounds/{round_id}", tags=["Game Management"])
@@ -884,7 +1005,7 @@ async def update_round(
     await game_connections.broadcast(int(updated_round["game_id"]))
     await game_connections.broadcast_list()
     if _game_is_completed(updated_round["game_id"]):
-        recompute_badges()
+        recompute_standings()
     return updated_round
 
 @app.delete("/rounds/{round_id}", tags=["Game Management"])
@@ -921,7 +1042,7 @@ async def delete_round(round_id, user_id: str = Depends(get_current_user_id)):
     await game_connections.broadcast(int(game_id))
     await game_connections.broadcast_list()
     if _game_is_completed(game_id):
-        recompute_badges()
+        recompute_standings()
     return response.data
 
 @app.get("/players", tags=["Player Management"])
@@ -970,6 +1091,109 @@ def get_badges():
             "holder_scoreboard_avatar_url": holder["scoreboard_avatar_url"] if holder else None,
         })
     return result
+
+
+@app.get("/achievements", tags=["Achievement Management"])
+def get_achievements():
+    earned_response = supabase.table(TABLE_NAMES.PLAYER_ACHIEVEMENTS.value).select("*").execute()
+
+    # {achievement_key: {player_id: {tier: earned_at}}}
+    earned_by_key: dict[str, dict[int, dict[str, str]]] = {}
+    for row in earned_response.data:
+        earned_by_key.setdefault(row["achievement_key"], {}).setdefault(row["player_id"], {})[row["tier"]] = row["earned_at"]
+
+    player_ids = {row["player_id"] for row in earned_response.data}
+    players_by_id = {}
+    if player_ids:
+        players_response = (
+            supabase.table(TABLE_NAMES.PLAYERS.value)
+            .select("player_id, player_name")
+            .in_("player_id", list(player_ids))
+            .execute()
+        )
+        players_by_id = {player["player_id"]: player for player in players_response.data}
+        enrich_players_with_scoreboard_preferences(list(players_by_id.values()))
+
+    result = []
+    for achievement in ACHIEVEMENT_DEFS:
+        earners = []
+        for earner_player_id, tiers_earned in earned_by_key.get(achievement.key, {}).items():
+            player = players_by_id.get(earner_player_id)
+            if player is None:
+                continue
+            highest_tier = max(tiers_earned, key=ACHIEVEMENT_TIERS.index)
+            earners.append({
+                "player_id": earner_player_id,
+                "player_name": player["player_name"],
+                "scoreboard_initials": player["scoreboard_initials"],
+                "scoreboard_color": player["scoreboard_color"],
+                "scoreboard_avatar_url": player["scoreboard_avatar_url"],
+                "tier": highest_tier,
+                "earned_at": tiers_earned[highest_tier],
+                "tiers_earned": tiers_earned,
+            })
+        earners.sort(key=lambda earner: (-ACHIEVEMENT_TIERS.index(earner["tier"]), earner["earned_at"]))
+        result.append({
+            "achievement_key": achievement.key,
+            "title": achievement.title,
+            "description": achievement.description,
+            "tiers": [
+                {
+                    "tier": tier_def.tier,
+                    "threshold": tier_def.threshold,
+                    "display_threshold": achievement.format(tier_def.threshold),
+                }
+                for tier_def in achievement.tiers
+            ],
+            "earners": earners,
+        })
+    return result
+
+
+@app.get("/achievements/players/{player_id}", tags=["Achievement Management"])
+def get_player_achievements(player_id: int):
+    stats = aggregate_player_stats().get(player_id) or _empty_stats(player_id)
+    earned_response = (
+        supabase.table(TABLE_NAMES.PLAYER_ACHIEVEMENTS.value)
+        .select("achievement_key, tier, earned_at")
+        .eq("player_id", player_id)
+        .execute()
+    )
+    earned_by_key: dict[str, dict[str, str]] = {}
+    for row in earned_response.data:
+        earned_by_key.setdefault(row["achievement_key"], {})[row["tier"]] = row["earned_at"]
+
+    result = []
+    for achievement in ACHIEVEMENT_DEFS:
+        value = achievement.metric(stats)
+        earned_tiers = earned_by_key.get(achievement.key, {})
+        tiers = [
+            {
+                "tier": tier_def.tier,
+                "threshold": tier_def.threshold,
+                "display_threshold": achievement.format(tier_def.threshold),
+                # Sticky: the DB is the authority — current_value can sit below an earned
+                # tier's threshold after data edits, and earned stays true regardless.
+                "earned": tier_def.tier in earned_tiers,
+                "earned_at": earned_tiers.get(tier_def.tier),
+            }
+            for tier_def in achievement.tiers
+        ]
+        earned_names = [tier["tier"] for tier in tiers if tier["earned"]]
+        highest_earned_tier = max(earned_names, key=ACHIEVEMENT_TIERS.index) if earned_names else None
+        next_tier = next((tier for tier in tiers if not tier["earned"]), None)
+        result.append({
+            "achievement_key": achievement.key,
+            "title": achievement.title,
+            "description": achievement.description,
+            "current_value": value,
+            "display_value": achievement.format(value),
+            "tiers": tiers,
+            "highest_earned_tier": highest_earned_tier,
+            "next_tier": next_tier,
+        })
+    return result
+
 
 @app.post("/players", tags=["Player Management"])
 def create_player(player_name: str, user_id: str = Depends(get_current_user_id)):

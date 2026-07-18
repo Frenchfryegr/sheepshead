@@ -1,5 +1,14 @@
 /* You can add global styles to this file, and also import other style files */
 
+:root {
+  /* Achievement tier colors, shared by the /achievements page and the profile section.
+     Silver is a blue-gray (not #c0c0c0) so it stays visually distinct from the muted
+     gray used for unearned tiers. */
+  --tier-bronze: #cd7f32;
+  --tier-silver: #9fa8b5;
+  --tier-gold: #d4af37;
+}
+
 html, body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;

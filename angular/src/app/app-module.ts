@@ -11,9 +11,10 @@ import { AuthInterceptor } from './auth/auth-interceptor';
 import { AccountBar } from './auth/account-bar/account-bar';
 import { Profile } from './profile/profile';
 import { Badges } from './badges/badges';
+import { Achievements } from './achievements/achievements';
 
 @NgModule({
-  declarations: [App, Games, AccountBar, Profile, Badges],
+  declarations: [App, Games, AccountBar, Profile, Badges, Achievements],
   imports: [BrowserModule, AppRoutingModule, FormsModule, HttpClientModule],
   providers: [
     provideBrowserGlobalErrorListeners(),

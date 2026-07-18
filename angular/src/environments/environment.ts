@@ -4,5 +4,6 @@ export const environment = {
     rounds: "rounds",
     players: "players",
     auth: "auth",
-    badges: "badges"
+    badges: "badges",
+    achievements: "achievements"
 };

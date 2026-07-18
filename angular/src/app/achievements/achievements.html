@@ -1,0 +1,62 @@
+<main class="achievements-page">
+  <div class="achievements-page__header">
+    <button class="btn btn-secondary" routerLink="/">Back to Games</button>
+    <h1>Achievements</h1>
+  </div>
+
+  @if (isLoading()) {
+    <p class="achievements-empty">Loading achievements...</p>
+  } @else {
+    <div class="achievements-search">
+      <input
+        type="search"
+        class="achievements-search__input"
+        placeholder="Search by achievement, player, or description..."
+        [value]="searchQuery()"
+        (input)="searchQuery.set($any($event.target).value)"
+        aria-label="Search achievements"
+      />
+    </div>
+
+    @if (filteredAchievements().length === 0) {
+      <p class="achievements-empty">No achievements match your search.</p>
+    } @else {
+      <div class="achievements-grid">
+        @for (achievement of filteredAchievements(); track achievement.achievement_key) {
+          <article class="achievement-card">
+            <div class="achievement-card__body">
+              <h2>{{ achievement.title }}</h2>
+              <p>{{ achievement.description }}</p>
+              <div class="achievement-tiers">
+                @for (tier of achievement.tiers; track tier.tier) {
+                  <span class="achievement-tier-pill tier-{{ tier.tier }}">
+                    {{ tier.tier }} &middot; {{ tier.display_threshold }}
+                  </span>
+                }
+              </div>
+            </div>
+            @if (achievement.earners.length === 0) {
+              <span class="achievement-unearned">Not earned yet</span>
+            } @else {
+              <div class="achievement-earners">
+                @for (earner of achievement.earners; track earner.player_id) {
+                  <div class="achievement-earner">
+                    <div class="achievement-earner__avatar" [style.background-color]="earner.scoreboard_color || '#667eea'">
+                      @if (earner.scoreboard_avatar_url) {
+                        <img [src]="earner.scoreboard_avatar_url" alt="" />
+                      } @else {
+                        {{ initials(earner) }}
+                      }
+                    </div>
+                    <span class="achievement-earner__name">{{ earner.player_name }}</span>
+                    <span class="achievement-earner__tier tier-{{ earner.tier }}" [title]="'Earned ' + earnedDate(earner)">{{ earner.tier }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </article>
+        }
+      </div>
+    }
+  }
+</main>
