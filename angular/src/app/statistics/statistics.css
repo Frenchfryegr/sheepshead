@@ -8,8 +8,68 @@
 .statistics-page__header {
   align-items: center;
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   margin-bottom: 5px;
+}
+
+/* "Show only me" switch (component-scoped styles aren't shared, so each page redeclares it). */
+.only-me {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 8px;
+  margin-left: auto;
+  user-select: none;
+}
+
+.only-me input {
+  height: 0;
+  opacity: 0;
+  position: absolute;
+  width: 0;
+}
+
+.only-me__label {
+  color: #374151;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.only-me__track {
+  background: #d1d5db;
+  border-radius: 999px;
+  flex-shrink: 0;
+  height: 22px;
+  position: relative;
+  transition: background 0.15s ease;
+  width: 40px;
+}
+
+.only-me__thumb {
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  height: 18px;
+  left: 2px;
+  position: absolute;
+  top: 2px;
+  transition: transform 0.15s ease;
+  width: 18px;
+}
+
+.only-me input:checked + .only-me__track {
+  background: #667eea;
+}
+
+.only-me input:checked + .only-me__track .only-me__thumb {
+  transform: translateX(18px);
+}
+
+.only-me input:focus-visible + .only-me__track {
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
 }
 
 .statistics-page h1,

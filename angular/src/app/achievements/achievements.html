@@ -1,6 +1,13 @@
 <main class="achievements-page">
   <div class="achievements-page__header">
     <h1>Achievements</h1>
+    @if (canFilterToMe()) {
+      <label class="only-me">
+        <span class="only-me__label">Show only me</span>
+        <input type="checkbox" [checked]="showOnlyMe()" (change)="toggleOnlyMe($any($event.target).checked)" />
+        <span class="only-me__track"><span class="only-me__thumb"></span></span>
+      </label>
+    }
   </div>
 
   @if (isLoading()) {
@@ -18,7 +25,7 @@
     </div>
 
     @if (filteredAchievements().length === 0) {
-      <p class="achievements-empty">No achievements match your search.</p>
+      <p class="achievements-empty">{{ emptyMessage() }}</p>
     } @else {
       <div class="achievements-grid">
         @for (achievement of filteredAchievements(); track achievement.achievement_key) {

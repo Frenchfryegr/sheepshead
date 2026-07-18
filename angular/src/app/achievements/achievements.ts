@@ -1,6 +1,8 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { AchievementsService } from './achievements-service';
+import { AuthService } from '../auth/auth-service';
 import { AchievementEarner } from '../interfaces/achievement';
 
 @Component({
@@ -11,6 +13,9 @@ import { AchievementEarner } from '../interfaces/achievement';
 })
 export class Achievements implements OnInit {
   private achievementsService = inject(AchievementsService)
+  private authService = inject(AuthService)
+  private route = inject(ActivatedRoute)
+  private router = inject(Router)
 
   // Read directly from AchievementsService's cache (not a local copy) so the last-known
   // list survives this component being destroyed and recreated on route navigation.
@@ -18,20 +23,38 @@ export class Achievements implements OnInit {
   isLoading = signal(this.achievements().length === 0)
   searchQuery = signal('')
 
+  // "Show only me" is on by default; a ?showOnlyMe=false query param (read in ngOnInit,
+  // written on toggle) overrides it so a shared big-screen URL survives refresh.
+  showOnlyMe = signal(true)
+  canFilterToMe = computed(() => this.authService.isAuthenticated() && this.authService.claimedPlayerId() != null)
+  onlyMe = computed(() => this.showOnlyMe() && this.canFilterToMe())
+
   filteredAchievements = computed(() => {
     const query = this.searchQuery().trim().toLowerCase()
-    const achievements = query
-      ? this.achievements().filter(achievement =>
-          achievement.title.toLowerCase().includes(query) ||
-          achievement.description.toLowerCase().includes(query) ||
-          achievement.earners.some(earner => earner.player_name.toLowerCase().includes(query))
-        )
-      : this.achievements()
+    let achievements = this.achievements()
+    if (this.onlyMe()) {
+      const me = this.authService.claimedPlayerId()
+      // Keep only achievements I've earned, and show just my chip on each.
+      achievements = achievements
+        .map(achievement => ({ ...achievement, earners: achievement.earners.filter(earner => earner.player_id === me) }))
+        .filter(achievement => achievement.earners.length > 0)
+    }
+    if (query) {
+      achievements = achievements.filter(achievement =>
+        achievement.title.toLowerCase().includes(query) ||
+        achievement.description.toLowerCase().includes(query) ||
+        achievement.earners.some(earner => earner.player_name.toLowerCase().includes(query))
+      )
+    }
     // Display order only — the backend registry order (ACHIEVEMENT_DEFS in api/main.py) is left as-is.
     return [...achievements].sort((a, b) => a.title.localeCompare(b.title))
   })
 
   ngOnInit() {
+    const param = this.route.snapshot.queryParamMap.get('showOnlyMe')
+    if (param === 'false') this.showOnlyMe.set(false)
+    else if (param === 'true') this.showOnlyMe.set(true)
+
     this.achievementsService.getAchievements().subscribe({
       next: achievements => {
         this.achievementsService.setAchievements(achievements)
@@ -39,6 +62,22 @@ export class Achievements implements OnInit {
       },
       error: () => this.isLoading.set(false),
     })
+  }
+
+  toggleOnlyMe(value: boolean) {
+    this.showOnlyMe.set(value)
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { showOnlyMe: value },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    })
+  }
+
+  emptyMessage(): string {
+    if (this.onlyMe()) return 'You haven’t earned any achievements yet.'
+    if (this.searchQuery().trim()) return 'No achievements match your search.'
+    return 'No achievements yet.'
   }
 
   initials(earner: AchievementEarner): string {
