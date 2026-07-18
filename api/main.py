@@ -117,6 +117,15 @@ BADGE_DEFS: list[BadgeDef] = [
             lambda stats: _alpha_priority(stats.get("player_name")),
         ),
     ),
+    BadgeDef(
+        key="punching_bag",
+        title="Punching Bag",
+        description="Most times losing with no schneider",
+        value=lambda stats: float(stats["punching_bag_count"]),
+        eligible=lambda stats: stats["punching_bag_count"] >= 1,
+        tiebreak_sample=lambda stats: stats["punching_bag_count"],
+        format=_count,
+    ),
 ]
 
 
@@ -348,6 +357,7 @@ def _empty_stats(player_id: int) -> dict:
         "lone_wolf_count": 0,
         "overconfident_count": 0,
         "overconfident_last_created": None,
+        "punching_bag_count": 0,
     }
 
 
@@ -389,6 +399,8 @@ def aggregate_player_stats() -> dict[int, dict]:
                         stats_for_player["picker_wins"] += 1
                     if no_schneider and is_picker_win:
                         stats_for_player["picker_schneider_wins"] += 1
+                    if no_schneider and is_picker_loss:
+                        stats_for_player["punching_bag_count"] += 1
                     if no_partner:
                         stats_for_player["lone_wolf_count"] += 1
                         if is_picker_loss:
@@ -400,6 +412,11 @@ def aggregate_player_stats() -> dict[int, dict]:
                     stats_for_player["partner_rounds"] += 1
                     if is_picker_win:
                         stats_for_player["partner_wins"] += 1
+                    if no_schneider and is_picker_loss:
+                        stats_for_player["punching_bag_count"] += 1
+                elif role == "Opponent":
+                    if no_schneider and is_picker_win:
+                        stats_for_player["punching_bag_count"] += 1
 
     if stats:
         players_response = (
