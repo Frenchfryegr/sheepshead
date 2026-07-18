@@ -219,7 +219,7 @@ class AchievementDef:
 ACHIEVEMENT_DEFS: list[AchievementDef] = [
     AchievementDef(
         key="picker_champion",
-        title="Picker Champion",
+        title="The People's Champion",
         description="Win rounds as the picker",
         metric=lambda stats: float(stats["picker_wins"]),
         tiers=(
@@ -230,7 +230,7 @@ ACHIEVEMENT_DEFS: list[AchievementDef] = [
     ),
     AchievementDef(
         key="leaster_legend",
-        title="Leaster Legend",
+        title="The Least Of Us",
         description="Win leaster rounds",
         metric=lambda stats: float(stats["leaster_wins"]),
         tiers=(
@@ -241,7 +241,7 @@ ACHIEVEMENT_DEFS: list[AchievementDef] = [
     ),
     AchievementDef(
         key="table_regular",
-        title="Table Regular",
+        title="Honorary Cheesehead",
         description="Play completed games",
         metric=lambda stats: float(stats["games_played"]),
         tiers=(
@@ -252,8 +252,8 @@ ACHIEVEMENT_DEFS: list[AchievementDef] = [
     ),
     AchievementDef(
         key="game_winner",
-        title="Winner Winner",
-        description="Win games (highest final score)",
+        title="Good At The Game",
+        description="Win games",
         metric=lambda stats: float(stats["games_won"]),
         tiers=(
             AchievementTier("bronze", 3),
@@ -263,7 +263,7 @@ ACHIEVEMENT_DEFS: list[AchievementDef] = [
     ),
     AchievementDef(
         key="perfect_solo",
-        title="Perfect Solo",
+        title="\"I Don\'t Need No Man\"",
         description="Go alone and win a no-trick round",
         metric=lambda stats: float(stats["no_trick_lone_wins"]),
         tiers=(AchievementTier("gold", 1),),
