@@ -6,12 +6,14 @@ import { Games } from './games/games/games';
 import { Profile } from './profile/profile';
 import { Badges } from './badges/badges';
 import { Achievements } from './achievements/achievements';
+import { Statistics } from './statistics/statistics';
 
 const routes: Routes = [
   { path: '', component: Games },
   { path: 'profile', component: Profile, canActivate: [profileGuard] },
   { path: 'badges', component: Badges },
   { path: 'achievements', component: Achievements },
+  { path: 'statistics', component: Statistics },
   { path: '**', redirectTo: '' },
 ];
 

@@ -1,6 +1,7 @@
 <div class="account-bar">
   <a class="account-bar__link" routerLink="/badges">Badges</a>
   <a class="account-bar__link" routerLink="/achievements">Achievements</a>
+  <a class="account-bar__link" routerLink="/statistics">Stats</a>
   @if (authService.isAuthenticated()) {
     <button class="account-bar__profile" type="button" (click)="openProfile()" aria-label="Open profile">
       <span class="account-bar__avatar">

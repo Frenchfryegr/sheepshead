@@ -1,0 +1,193 @@
+.statistics-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0 auto;
+  max-width: 1000px;
+  padding: 24px;
+}
+
+.statistics-page__header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.statistics-page h1,
+.statistic-card h2,
+.statistic-card p {
+  margin: 0;
+}
+
+.statistics-page h1,
+.statistic-card h2 {
+  color: #1a1a2e;
+}
+
+.statistics-page h1 {
+  font-size: 1.7rem;
+}
+
+/* Buttons (component-scoped styles are not shared across Angular components,
+   so the .btn classes used elsewhere must be redeclared here). */
+.btn {
+  align-items: center;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 600;
+  gap: 6px;
+  justify-content: center;
+  padding: 10px 20px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.statistics-scope {
+  margin-bottom: 20px;
+}
+
+.statistics-toggle {
+  display: inline-flex;
+  background: #f3f4f6;
+  border-radius: 8px;
+  gap: 2px;
+  padding: 3px;
+}
+
+.statistics-toggle__btn {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 8px 18px;
+  transition: all 0.15s ease;
+}
+
+.statistics-toggle__btn--active {
+  background: #ffffff;
+  color: #1a1a2e;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.statistics-footnote {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin: 8px 0 0;
+}
+
+.statistics-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.statistic-card {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.statistic-card h2 {
+  font-size: 1.05rem;
+  margin-bottom: 5px;
+}
+
+.statistic-card p,
+.statistics-empty,
+.statistic-empty-board {
+  color: #6b7280;
+}
+
+.statistic-empty-board {
+  font-size: 0.85rem;
+}
+
+.statistic-board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statistic-row {
+  align-items: center;
+  display: flex;
+  font-weight: 600;
+  gap: 8px;
+}
+
+.statistic-row__rank {
+  color: #9ca3af;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: right;
+}
+
+.statistic-row__avatar {
+  align-items: center;
+  border-radius: 50%;
+  color: white;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  height: 32px;
+  justify-content: center;
+  overflow: hidden;
+  width: 32px;
+}
+
+.statistic-row__avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.statistic-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statistic-row__value {
+  color: #1a1a2e;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.statistic-row__sample {
+  color: #9ca3af;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .statistics-page {
+    padding: 12px;
+  }
+
+  .statistics-grid {
+    grid-template-columns: 1fr;
+  }
+}

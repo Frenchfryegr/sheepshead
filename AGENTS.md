@@ -90,7 +90,7 @@ the engine — read it before scanning `main.py` yourself.
 
 ### What's already selected in the one query (`aggregate_player_stats`)
 
-The query already pulls, per completed game: `game_id`, roster player IDs
+The query already pulls, per completed game: `game_id`, `num_players`, roster player IDs
 (`Players_X_Games(player_id)`), and per round: `round_number`, `round_result`, `no_schneider`,
 `no_partner`, `no_trick`, `created`, and per player-round-score row: `player_id`, `player_role`,
 `point_delta`.
@@ -249,3 +249,69 @@ almost always a pure-Python change with no migration, no new endpoint, and no fr
    registry). Optionally clean up its rows manually.
 7. Changing a threshold: fine going **down** (next recompute back-fills newly-qualified players);
    going **up** does NOT revoke already-earned rows (sticky) — flag that to whoever asked.
+
+## 📊 Adding a Statistic
+
+A "statistic" is a per-player derived number (percentage or count) computed over completed games.
+Unlike badges (one holder) and achievements (earned milestones), stats are **pure derived data
+for every player** — nothing is "held" or "earned". The system is **registry-driven inside
+`api/main.py`** — a new stat is almost always a pure-Python change with no migration, no new
+endpoint, and no frontend change.
+
+### Live computation, no storage
+
+Stats are **computed at request time** from `aggregate_player_stats()` — the same aggregation pass
+badges and achievements use. There is **no stats table, no migration, no recompute wiring, and no
+triggers**. Both endpoints call `aggregate_player_stats()` directly (like
+`GET /achievements/players/{id}`), so a new stat is picked up automatically with no seeding.
+
+### Splits and the bucket contract
+
+Every stat is reported for three scopes: **overall**, **three_hand**, and **five_hand**
+(`STAT_SCOPES`). The two splits (`STAT_SPLITS`) **partition all games** — `num_players == 5` is
+`five_hand`, and **both 3- AND 4-player games fold into `three_hand`** (4-player rounds are played
+3-handed with the dealer sitting out). **Overall is derived by summing the two split buckets**
+(`_merged_bucket()`), never maintained as a third bucket — so aggregation only ever increments a
+split bucket.
+
+`aggregate_player_stats()` builds a nested `by_split` dict on each player's stats: one
+`_empty_stat_bucket()` per split, holding the counters statistics need (`picker_rounds`,
+`picker_wins`, `partner_rounds`, `partner_wins`, `rounds_played`, `rounds_won`, `leaster_rounds`,
+`leaster_wins`, `games_played`, `games_won`). These live **alongside** the existing flat counters
+(which badges/achievements still read, untouched) — the split increments sit adjacent to the flat
+increments in each loop branch so the two can't drift. `split_key` is computed once at the top of
+each game's iteration and is in scope for the roster loop, the flat per-round loop, and the
+per-game replay loop.
+
+### Where everything lives
+
+- `StatDef` (dataclass) + `STAT_DEFS` (the registry), right after `ACHIEVEMENT_DEFS`. A `StatDef`
+  has `key`, `title`, `description`, `value(bucket)` (returns `None` when the denominator is 0 —
+  use the `_ratio(num, den)` helper), `sample(bucket)` (the denominator/count, used for both the
+  display detail and eligibility), `min_sample` (leaderboard gate, applied per split's own sample),
+  and `format`. **All lambdas take a bucket** (a split bucket or the merged overall bucket) — that
+  single definition serves overall + both splits.
+- `GET /statistics` — public; per stat × per scope, builds a ranked leaderboard of **eligible**
+  players (sample ≥ `min_sample`). Tiebreak: value desc → bigger sample → more overall games →
+  lowest `player_id`. Generic over `STAT_DEFS`.
+- `GET /statistics/players/{player_id}` — public; per-stat overall/three_hand/five_hand values with
+  **no minimum gate** (the profile always shows the player's own numbers; `display_value: null`
+  renders as "—" client-side).
+- Frontend: `/statistics` page (`angular/src/app/statistics/`) with an Overall/3-Hand/5-Hand toggle,
+  and the profile's Statistics tiles (`profile.ts`/`.html`). Both render whatever the API returns
+  **in registry order** — statistics deliberately do **not** re-sort alphabetically like
+  badges/achievements. No frontend change for a new stat.
+
+### Workflow for a new statistic
+
+1. Get from whoever's asking: title, description, metric (numerator/denominator or count), and
+   leaderboard minimum sample.
+2. If the metric needs counters not in `_empty_stat_bucket()`: add them there and increment them
+   **per split bucket** in the correct aggregation loop (flat per-round vs. per-game replay — the
+   badge section's guidance applies). Overall is derived, so only split buckets are incremented.
+3. Append one `StatDef` to `STAT_DEFS`.
+4. Do **not** touch: any table/migration, either `/statistics` endpoint, `recompute_standings`/
+   triggers, or any frontend file — both endpoints and both UI surfaces are generic over `STAT_DEFS`.
+5. Validate with `python -c "import ast; ast.parse(open('api/main.py', encoding='utf-8').read())"`
+   unless asked to run/verify live.
+6. Retiring a stat: remove its def. Since nothing is stored, it simply stops appearing.

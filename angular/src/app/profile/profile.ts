@@ -5,9 +5,11 @@ import { AuthService } from '../auth/auth-service';
 import { GamesService } from '../games/games-service';
 import { BadgesService } from '../badges/badges-service';
 import { AchievementsService } from '../achievements/achievements-service';
+import { StatisticsService } from '../statistics/statistics-service';
 import { ProfileInfo } from '../interfaces/auth';
 import { Badge } from '../interfaces/badge';
 import { PlayerAchievement, PlayerAchievementTier } from '../interfaces/achievement';
+import { PlayerStatistic, StatScope, StatValue } from '../interfaces/statistic';
 import { Player } from '../interfaces/player';
 
 const MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
@@ -23,6 +25,7 @@ export class Profile implements OnInit {
   private gamesService = inject(GamesService)
   private badgesService = inject(BadgesService)
   private achievementsService = inject(AchievementsService)
+  private statisticsService = inject(StatisticsService)
   private router = inject(Router)
 
   @ViewChild('ClaimDialog') claimDialog!: ElementRef<HTMLDialogElement>
@@ -48,6 +51,12 @@ export class Profile implements OnInit {
   playerAchievements = signal<PlayerAchievement[]>(
     this.sortAchievements(this.achievementsService.cachedPlayerAchievements(this.profile()?.claimed_player_id))
   )
+  // No sorting — statistics preserve API (registry) order, unlike badges/achievements.
+  playerStatistics = signal<PlayerStatistic[]>(
+    this.statisticsService.cachedPlayerStatistics(this.profile()?.claimed_player_id)
+  )
+  // Split toggle for the stat tiles, mirroring the public /statistics page.
+  selectedStatScope = signal<StatScope>('overall')
 
   ngOnInit() {
     this.loadProfile()
@@ -63,6 +72,7 @@ export class Profile implements OnInit {
         this.applyProfile(profile)
         this.loadHeldBadges(profile)
         this.loadPlayerAchievements(profile)
+        this.loadPlayerStatistics(profile)
         this.isLoading.set(false)
       },
       error: (err) => {
@@ -175,6 +185,7 @@ export class Profile implements OnInit {
         this.applyProfile(profile)
         this.loadHeldBadges(profile)
         this.loadPlayerAchievements(profile)
+        this.loadPlayerStatistics(profile)
       },
       error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not claim player')
     })
@@ -187,6 +198,7 @@ export class Profile implements OnInit {
         this.applyProfile(profile)
         this.loadHeldBadges(profile)
         this.loadPlayerAchievements(profile)
+        this.loadPlayerStatistics(profile)
       },
       error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not unclaim player')
     })
@@ -249,6 +261,40 @@ export class Profile implements OnInit {
   private sortAchievements(achievements: PlayerAchievement[]): PlayerAchievement[] {
     // Display order only — the backend registry order (ACHIEVEMENT_DEFS in api/main.py) is left as-is.
     return [...achievements].sort((a, b) => a.title.localeCompare(b.title))
+  }
+
+  private loadPlayerStatistics(profile: ProfileInfo) {
+    const playerId = profile.claimed_player_id
+    if (playerId === null) {
+      this.playerStatistics.set([])
+      return
+    }
+    this.statisticsService.getPlayerStatistics(playerId).subscribe({
+      next: statistics => {
+        this.statisticsService.setPlayerStatistics(playerId, statistics)
+        // No sorting — preserve API (registry) order (deliberate deviation from badges/achievements).
+        this.playerStatistics.set(statistics)
+      },
+      error: () => this.playerStatistics.set([]),
+    })
+  }
+
+  // The StatValue for the currently selected scope (overall / three_hand / five_hand).
+  selectedStatValue(stat: PlayerStatistic): StatValue {
+    return stat[this.selectedStatScope()]
+  }
+
+  // Percentage stats show the full "num/den" fraction; count stats show just the sample.
+  statDetail(value: StatValue): string {
+    if (value.numerator != null) return `${value.numerator}/${value.sample_size}`
+    return `${value.sample_size}`
+  }
+
+  // A split's percentage with its "(num/den)" fraction, or "—" when there's no sample.
+  splitLabel(value: StatValue): string {
+    if (value.display_value == null) return '—'
+    if (value.numerator != null) return `${value.display_value} (${value.numerator}/${value.sample_size})`
+    return value.display_value
   }
 
   achievementProgress(achievement: PlayerAchievement): number {

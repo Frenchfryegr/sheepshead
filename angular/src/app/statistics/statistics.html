@@ -1,0 +1,68 @@
+<main class="statistics-page">
+  <div class="statistics-page__header">
+    <button class="btn btn-secondary" routerLink="/">Back to Games</button>
+    <h1>Statistics</h1>
+  </div>
+
+  @if (isLoading()) {
+    <p class="statistics-empty">Loading statistics...</p>
+  } @else {
+    <div class="statistics-scope">
+      <div class="statistics-toggle" role="group" aria-label="Statistics split">
+        <button
+          type="button"
+          class="statistics-toggle__btn"
+          [class.statistics-toggle__btn--active]="selectedScope() === 'overall'"
+          (click)="selectedScope.set('overall')"
+        >Overall</button>
+        <button
+          type="button"
+          class="statistics-toggle__btn"
+          [class.statistics-toggle__btn--active]="selectedScope() === 'three_hand'"
+          (click)="selectedScope.set('three_hand')"
+        >3-Hand</button>
+        <button
+          type="button"
+          class="statistics-toggle__btn"
+          [class.statistics-toggle__btn--active]="selectedScope() === 'five_hand'"
+          (click)="selectedScope.set('five_hand')"
+        >5-Hand</button>
+      </div>
+      @if (selectedScope() === 'three_hand') {
+        <p class="statistics-footnote">4-player games count as 3-hand.</p>
+      }
+    </div>
+
+    <div class="statistics-grid">
+      @for (stat of statistics(); track stat.stat_key) {
+        <article class="statistic-card">
+          <div class="statistic-card__body">
+            <h2>{{ stat.title }}</h2>
+            <p>{{ stat.description }}</p>
+          </div>
+          @if (entries(stat).length === 0) {
+            <span class="statistic-empty-board">No players with {{ stat.min_sample }}+ qualifying rounds yet.</span>
+          } @else {
+            <div class="statistic-board">
+              @for (entry of entries(stat); track entry.player_id) {
+                <div class="statistic-row">
+                  <span class="statistic-row__rank">{{ entry.rank }}</span>
+                  <div class="statistic-row__avatar" [style.background-color]="entry.scoreboard_color || '#667eea'">
+                    @if (entry.scoreboard_avatar_url) {
+                      <img [src]="entry.scoreboard_avatar_url" alt="" />
+                    } @else {
+                      {{ initials(entry) }}
+                    }
+                  </div>
+                  <span class="statistic-row__name">{{ entry.player_name }}</span>
+                  <span class="statistic-row__value">{{ entry.display_value }}</span>
+                  <span class="statistic-row__sample">({{ detail(entry) }})</span>
+                </div>
+              }
+            </div>
+          }
+        </article>
+      }
+    </div>
+  }
+</main>

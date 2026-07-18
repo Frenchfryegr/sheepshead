@@ -38,6 +38,56 @@
       }
 
       <div class="profile-section">
+        <h2>Statistics</h2>
+        @if (!profile()?.claimed_player_id) {
+          <p class="text-muted">Claim a player to see your statistics.</p>
+        } @else if (playerStatistics().length === 0) {
+          <p class="text-muted">Loading statistics...</p>
+        } @else {
+          <div class="profile-stat-scope">
+            <div class="profile-stat-toggle" role="group" aria-label="Statistics split">
+              <button
+                type="button"
+                class="profile-stat-toggle__btn"
+                [class.profile-stat-toggle__btn--active]="selectedStatScope() === 'overall'"
+                (click)="selectedStatScope.set('overall')"
+              >Overall</button>
+              <button
+                type="button"
+                class="profile-stat-toggle__btn"
+                [class.profile-stat-toggle__btn--active]="selectedStatScope() === 'three_hand'"
+                (click)="selectedStatScope.set('three_hand')"
+              >3-Hand</button>
+              <button
+                type="button"
+                class="profile-stat-toggle__btn"
+                [class.profile-stat-toggle__btn--active]="selectedStatScope() === 'five_hand'"
+                (click)="selectedStatScope.set('five_hand')"
+              >5-Hand</button>
+            </div>
+            @if (selectedStatScope() === 'three_hand') {
+              <p class="profile-stat-footnote">4-player games count as 3-hand.</p>
+            }
+          </div>
+          <div class="profile-stat-grid">
+            @for (stat of playerStatistics(); track stat.stat_key) {
+              <div class="profile-stat" [title]="stat.description">
+                <span class="profile-stat__title">{{ stat.title }}</span>
+                <strong class="profile-stat__value">{{ selectedStatValue(stat).display_value ?? '—' }}</strong>
+                <span class="profile-stat__sample">({{ statDetail(selectedStatValue(stat)) }})</span>
+                @if (selectedStatScope() === 'overall') {
+                  <div class="profile-stat__splits">
+                    <span>3-Hand: {{ splitLabel(stat.three_hand) }}</span>
+                    <span>5-Hand: {{ splitLabel(stat.five_hand) }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="profile-section">
         <h2>Badges</h2>
         @if (!profile()?.claimed_player_id) {
           <p class="text-muted">Claim a player to start earning badges.</p>
