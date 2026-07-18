@@ -3,5 +3,6 @@ export const environment = {
     games: "games",
     rounds: "rounds",
     players: "players",
-    auth: "auth"
+    auth: "auth",
+    badges: "badges"
 };

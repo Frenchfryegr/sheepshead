@@ -3,7 +3,9 @@ import { Router } from '@angular/router';
 
 import { AuthService } from '../auth/auth-service';
 import { GamesService } from '../games/games-service';
+import { BadgesService } from '../badges/badges-service';
 import { ProfileInfo } from '../interfaces/auth';
+import { Badge } from '../interfaces/badge';
 import { Player } from '../interfaces/player';
 
 const MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
@@ -17,6 +19,7 @@ const MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
 export class Profile implements OnInit {
   private authService = inject(AuthService)
   private gamesService = inject(GamesService)
+  private badgesService = inject(BadgesService)
   private router = inject(Router)
 
   @ViewChild('ClaimDialog') claimDialog!: ElementRef<HTMLDialogElement>
@@ -35,6 +38,7 @@ export class Profile implements OnInit {
   isDeletingPicture = signal(false)
   players = signal<Player[]>([])
   claimError = signal<string | null>(null)
+  heldBadges = signal<Badge[]>([])
 
   ngOnInit() {
     this.loadProfile()
@@ -46,6 +50,7 @@ export class Profile implements OnInit {
     this.authService.getProfile().subscribe({
       next: (profile) => {
         this.applyProfile(profile)
+        this.loadHeldBadges(profile)
         this.isLoading.set(false)
       },
       error: (err) => {
@@ -154,7 +159,10 @@ export class Profile implements OnInit {
   claim(playerId: number) {
     this.claimError.set(null)
     this.authService.claimPlayer(playerId).subscribe({
-      next: profile => this.applyProfile(profile),
+      next: profile => {
+        this.applyProfile(profile)
+        this.loadHeldBadges(profile)
+      },
       error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not claim player')
     })
   }
@@ -162,7 +170,10 @@ export class Profile implements OnInit {
   unclaim(playerId: number) {
     this.claimError.set(null)
     this.authService.unclaimPlayer(playerId).subscribe({
-      next: profile => this.applyProfile(profile),
+      next: profile => {
+        this.applyProfile(profile)
+        this.loadHeldBadges(profile)
+      },
       error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not unclaim player')
     })
   }
@@ -182,5 +193,16 @@ export class Profile implements OnInit {
     this.scoreboardInitials.set(profile.scoreboard_initials ?? '')
     this.scoreboardColor.set(profile.scoreboard_color ?? '')
     this.showAvatarOnScoreboard.set(profile.show_avatar_on_scoreboard)
+  }
+
+  private loadHeldBadges(profile: ProfileInfo) {
+    if (profile.claimed_player_id === null) {
+      this.heldBadges.set([])
+      return
+    }
+    this.badgesService.getBadges().subscribe({
+      next: badges => this.heldBadges.set(badges.filter(badge => badge.holder_player_id === profile.claimed_player_id)),
+      error: () => this.heldBadges.set([]),
+    })
   }
 }

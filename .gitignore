@@ -9,3 +9,8 @@ angular/.vscode
 __pycache__/
 *.pyc
 .venv/
+
+#ai stuff
+.claude/
+.agents/
+.mcp.json

@@ -8,7 +8,7 @@ RUN npm ci
 
 COPY . .
 
-RUN printf 'export const environment = {\n  apiUrl: "%s",\n  games: "games",\n  rounds: "rounds",\n  players: "players",\n  auth: "auth"\n};\n' "$API_URL" > src/environments/environment.ts
+RUN printf 'export const environment = {\n  apiUrl: "%s",\n  games: "games",\n  rounds: "rounds",\n  players: "players",\n  auth: "auth",\n  badges: "badges"\n};\n' "$API_URL" > src/environments/environment.ts
 
 RUN npm run build
 

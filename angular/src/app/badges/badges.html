@@ -1,0 +1,51 @@
+<main class="badges-page">
+  <div class="badges-page__header">
+    <button class="btn btn-secondary" routerLink="/">Back to Games</button>
+    <h1>Badges</h1>
+  </div>
+
+  @if (isLoading()) {
+    <p class="badges-empty">Loading badges...</p>
+  } @else {
+    <div class="badges-search">
+      <input
+        type="search"
+        class="badges-search__input"
+        placeholder="Search by badge, player, or description..."
+        [value]="searchQuery()"
+        (input)="searchQuery.set($any($event.target).value)"
+        aria-label="Search badges"
+      />
+    </div>
+
+    @if (filteredBadges().length === 0) {
+      <p class="badges-empty">No badges match your search.</p>
+    } @else {
+      <div class="badges-grid">
+        @for (badge of filteredBadges(); track badge.badge_key) {
+          <article class="badge-card">
+            <div class="badge-card__body">
+              <h2>{{ badge.title }}</h2>
+              <p>{{ badge.description }}</p>
+            </div>
+            @if (badge.holder_player_id) {
+              <div class="badge-holder">
+                <div class="badge-holder__avatar" [style.background-color]="badge.holder_scoreboard_color || '#667eea'">
+                  @if (badge.holder_scoreboard_avatar_url) {
+                    <img [src]="badge.holder_scoreboard_avatar_url" alt="" />
+                  } @else {
+                    {{ initials(badge) }}
+                  }
+                </div>
+                <span class="badge-holder__name">{{ badge.holder_player_name }}</span>
+                <strong>{{ badge.display_value }}</strong>
+              </div>
+            } @else {
+              <span class="badge-unclaimed">Unclaimed</span>
+            }
+          </article>
+        }
+      </div>
+    }
+  }
+</main>

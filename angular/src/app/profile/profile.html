@@ -38,6 +38,27 @@
       }
 
       <div class="profile-section">
+        <h2>Badges</h2>
+        @if (!profile()?.claimed_player_id) {
+          <p class="text-muted">Claim a player to start earning badges.</p>
+        } @else if (heldBadges().length === 0) {
+          <p class="text-muted">No badges held yet.</p>
+        } @else {
+          <div class="profile-badge-list">
+            @for (badge of heldBadges(); track badge.badge_key) {
+              <div class="profile-badge">
+                <div>
+                  <h3>{{ badge.title }}</h3>
+                  <p>{{ badge.description }}</p>
+                </div>
+                <strong>{{ badge.display_value }}</strong>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="profile-section">
         <div class="profile-section__heading">
           <h2>Picture</h2>
           <label class="profile-checkbox">
