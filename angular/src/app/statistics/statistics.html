@@ -1,7 +1,13 @@
 <main class="statistics-page">
   <div class="statistics-page__header">
-    <button class="btn btn-secondary" routerLink="/">Back to Games</button>
     <h1>Statistics</h1>
+    @if (canFilterToMe()) {
+      <label class="only-me">
+        <span class="only-me__label">Show only me</span>
+        <input type="checkbox" [checked]="showOnlyMe()" (change)="toggleOnlyMe($any($event.target).checked)" />
+        <span class="only-me__track"><span class="only-me__thumb"></span></span>
+      </label>
+    }
   </div>
 
   @if (isLoading()) {
@@ -33,8 +39,11 @@
       }
     </div>
 
+    @if (visibleStatistics().length === 0) {
+      <p class="statistics-empty">{{ emptyMessage() }}</p>
+    } @else {
     <div class="statistics-grid">
-      @for (stat of statistics(); track stat.stat_key) {
+      @for (stat of visibleStatistics(); track stat.stat_key) {
         <article class="statistic-card">
           <div class="statistic-card__body">
             <h2>{{ stat.title }}</h2>
@@ -64,5 +73,6 @@
         </article>
       }
     </div>
+    }
   }
 </main>

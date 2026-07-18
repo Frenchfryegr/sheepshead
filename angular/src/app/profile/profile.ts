@@ -158,6 +158,13 @@ export class Profile implements OnInit {
     })
   }
 
+  logout() {
+    this.authService.logout().subscribe({
+      next: () => this.router.navigate(['/']),
+      error: () => this.router.navigate(['/']),
+    })
+  }
+
   openClaimDialog() {
     this.claimError.set(null)
     this.gamesService.getPlayers().subscribe({

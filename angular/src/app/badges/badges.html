@@ -1,7 +1,13 @@
 <main class="badges-page">
   <div class="badges-page__header">
-    <button class="btn btn-secondary" routerLink="/">Back to Games</button>
     <h1>Badges</h1>
+    @if (canFilterToMe()) {
+      <label class="only-me">
+        <span class="only-me__label">Show only me</span>
+        <input type="checkbox" [checked]="showOnlyMe()" (change)="toggleOnlyMe($any($event.target).checked)" />
+        <span class="only-me__track"><span class="only-me__thumb"></span></span>
+      </label>
+    }
   </div>
 
   @if (isLoading()) {
@@ -19,7 +25,7 @@
     </div>
 
     @if (filteredBadges().length === 0) {
-      <p class="badges-empty">No badges match your search.</p>
+      <p class="badges-empty">{{ emptyMessage() }}</p>
     } @else {
       <div class="badges-grid">
         @for (badge of filteredBadges(); track badge.badge_key) {

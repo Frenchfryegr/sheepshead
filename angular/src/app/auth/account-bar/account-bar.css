@@ -1,8 +1,8 @@
 .account-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
+  justify-content: space-between;
+  gap: 12px;
   max-width: 1200px;
   margin: 0 auto;
   padding: 14px 24px 0;
@@ -10,9 +10,27 @@
   font-size: 0.9rem;
 }
 
+.account-bar__nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.account-bar__account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
 .account-bar__username {
   font-weight: 700;
   color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
 }
 
 .account-bar__profile {
@@ -21,11 +39,12 @@
   gap: 8px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 999px;
   color: #1a1a2e;
   cursor: pointer;
-  padding: 4px 10px 4px 4px;
+  padding: 4px 12px 4px 4px;
   min-width: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .account-bar__profile:hover {
@@ -57,15 +76,25 @@
 .account-bar__link {
   background: none;
   border: none;
-  color: #667eea;
+  color: #4b5563;
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  padding: 4px 2px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .account-bar__link:hover {
-  text-decoration: underline;
+  background: #f3f4f6;
+  color: #1a1a2e;
+}
+
+.account-bar__link--active {
+  background: #eef2ff;
+  color: #667eea;
 }
 
 .account-bar__optional {
@@ -292,6 +321,34 @@
   .account-bar {
     padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
     font-size: 0.85rem;
+    gap: 8px;
+  }
+
+  /* Let the links flex-shrink and scroll rather than wrap or squash the profile chip. */
+  .account-bar__nav {
+    flex: 1 1 auto;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .account-bar__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .account-bar__link {
+    padding: 8px 11px;
+    font-size: 0.88rem;
+  }
+
+  /* Avatar-only chip on mobile — the username is shown on the profile page. */
+  .account-bar__username {
+    display: none;
+  }
+
+  .account-bar__profile {
+    padding: 3px;
+    border-radius: 50%;
   }
 
   .dialog {

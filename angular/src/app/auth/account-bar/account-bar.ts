@@ -109,13 +109,6 @@ export class AccountBar implements AfterViewInit {
     }
   }
 
-  logout() {
-    this.authService.logout().subscribe({
-      next: () => this.router.navigate(['/']),
-      error: () => this.router.navigate(['/']),
-    })
-  }
-
   openProfile() {
     this.router.navigate(['/profile'])
   }
