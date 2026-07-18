@@ -112,6 +112,43 @@
   margin-bottom: 0;
 }
 
+.profile-badge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-badge {
+  align-items: center;
+  background: #f9fafb;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.profile-badge h3,
+.profile-badge p {
+  margin: 0;
+}
+
+.profile-badge h3 {
+  color: #1a1a2e;
+  font-size: 0.95rem;
+}
+
+.profile-badge p {
+  color: #6b7280;
+  font-size: 0.85rem;
+  margin-top: 3px;
+}
+
+.profile-badge strong {
+  color: #667eea;
+  font-size: 1.1rem;
+}
+
 .profile-checkbox {
   display: inline-flex;
   align-items: center;

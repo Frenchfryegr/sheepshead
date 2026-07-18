@@ -1,11 +1,13 @@
 import os
 import re
 import logging
+from dataclasses import dataclass
 from dotenv import load_dotenv
 
 from enum import Enum
 from datetime import datetime, timezone
 from uuid import uuid4
+from typing import Callable
 
 from fastapi import FastAPI, Body, Header, HTTPException, Depends, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +21,7 @@ class TABLE_NAMES(Enum):
     PLAYERROUNDSCORE = "PlayerRoundScore"
     ROUNDS = "Rounds"
     ACCOUNTS = "Accounts"
+    BADGES = "Badges"
 
 class ROUND_RESULTS(Enum):
     PICKER_WIN = "Picker Win"
@@ -36,6 +39,96 @@ COLOR_PATTERN = re.compile(r"^#[0-9A-F]{6}$")
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class BadgeDef:
+    key: str
+    title: str
+    description: str
+    value: Callable[[dict], float]
+    eligible: Callable[[dict], bool]
+    tiebreak_sample: Callable[[dict], float]
+    format: Callable[[float], str]
+    # Extra tiebreak extractors evaluated (in order) after tiebreak_sample and before the
+    # generic games_played/player_id fallback. Empty for every badge except ones that need a
+    # bespoke tiebreak chain — leaving this empty preserves the original 4-tuple sort exactly.
+    tiebreakers: tuple[Callable[[dict], object], ...] = ()
+
+
+def _pct(value: float) -> str:
+    return f"{value * 100:.1f}%"
+
+
+def _count(value: float) -> str:
+    return str(int(value))
+
+
+def _alpha_priority(name: str) -> tuple:
+    # Inverts lexicographic order so that, under max(), the alphabetically-earliest name wins.
+    return tuple(-ord(ch) for ch in (name or "").lower())
+
+
+BADGE_DEFS: list[BadgeDef] = [
+    BadgeDef(
+        key="just_plain_good",
+        title="Just Plain Good",
+        description="Highest picker win %",
+        value=lambda stats: stats["picker_wins"] / stats["picker_rounds"],
+        eligible=lambda stats: stats["picker_rounds"] >= 5,
+        tiebreak_sample=lambda stats: stats["picker_rounds"],
+        format=_pct,
+    ),
+    BadgeDef(
+        key="the_sidekick",
+        title="The Sidekick",
+        description="Highest partner win %",
+        value=lambda stats: stats["partner_wins"] / stats["partner_rounds"],
+        eligible=lambda stats: stats["partner_rounds"] >= 5,
+        tiebreak_sample=lambda stats: stats["partner_rounds"],
+        format=_pct,
+    ),
+    BadgeDef(
+        key="dominator",
+        title="Dominator",
+        description="Highest schneider-win rate as picker",
+        value=lambda stats: stats["picker_schneider_wins"] / stats["picker_rounds"],
+        eligible=lambda stats: stats["picker_rounds"] >= 5,
+        tiebreak_sample=lambda stats: stats["picker_rounds"],
+        format=_pct,
+    ),
+    BadgeDef(
+        key="lone_wolf",
+        title="Lone Wolf",
+        description="Most times going alone (no partner)",
+        value=lambda stats: float(stats["lone_wolf_count"]),
+        eligible=lambda stats: stats["lone_wolf_count"] >= 1,
+        tiebreak_sample=lambda stats: stats["lone_wolf_count"],
+        format=lambda value: str(int(value)),
+    ),
+    BadgeDef(
+        key="overconfident",
+        title="Overconfident",
+        description="Most times going alone and losing",
+        value=lambda stats: float(stats["overconfident_count"]),
+        eligible=lambda stats: stats["overconfident_count"] >= 1,
+        tiebreak_sample=lambda stats: stats["overconfident_count"],
+        format=_count,
+        tiebreakers=(
+            lambda stats: stats.get("overconfident_last_created") or "",
+            lambda stats: _alpha_priority(stats.get("player_name")),
+        ),
+    ),
+    BadgeDef(
+        key="punching_bag",
+        title="Punching Bag",
+        description="Most times losing with no schneider",
+        value=lambda stats: float(stats["punching_bag_count"]),
+        eligible=lambda stats: stats["punching_bag_count"] >= 1,
+        tiebreak_sample=lambda stats: stats["punching_bag_count"],
+        format=_count,
+    ),
+]
+
+
 class ProfileUpdate(BaseModel):
     username: str | None = None
     contact_email: str | None = None
@@ -49,6 +142,7 @@ tags_metadata = [
     {"name": "Game Management", "description": "do stuff to da games"},
     {"name": "Player Management", "description": "do stuff to da playas"},
     {"name": "Auth", "description": "accounts, login, and player claiming"},
+    {"name": "Badge Management", "description": "badge standings"},
 
 ]
 
@@ -250,6 +344,155 @@ def enrich_players_with_scoreboard_preferences(players: list[dict]) -> None:
         player["scoreboard_avatar_url"] = preference.get("scoreboard_avatar_url")
 
 
+def _empty_stats(player_id: int) -> dict:
+    return {
+        "player_id": player_id,
+        "player_name": "",
+        "games_played": 0,
+        "picker_rounds": 0,
+        "picker_wins": 0,
+        "partner_rounds": 0,
+        "partner_wins": 0,
+        "picker_schneider_wins": 0,
+        "lone_wolf_count": 0,
+        "overconfident_count": 0,
+        "overconfident_last_created": None,
+        "punching_bag_count": 0,
+    }
+
+
+def aggregate_player_stats() -> dict[int, dict]:
+    response = (
+        supabase.table(TABLE_NAMES.GAMES.value)
+        .select(
+            f"game_id, {TABLE_NAMES.PLAYERSXGAMES.value}(player_id), "
+            f"{TABLE_NAMES.ROUNDS.value}(round_result, no_schneider, no_partner, created, "
+            f"{TABLE_NAMES.PLAYERROUNDSCORE.value}(player_id, player_role))"
+        )
+        .eq("is_completed", True)
+        .execute()
+    )
+    stats: dict[int, dict] = {}
+
+    def bucket(player_id: int) -> dict:
+        if player_id not in stats:
+            stats[player_id] = _empty_stats(player_id)
+        return stats[player_id]
+
+    for game in response.data:
+        for player_game in game.get(TABLE_NAMES.PLAYERSXGAMES.value, []):
+            bucket(player_game["player_id"])["games_played"] += 1
+
+        for round_row in game.get(TABLE_NAMES.ROUNDS.value, []):
+            round_result = round_row.get("round_result")
+            is_picker_win = round_result == ROUND_RESULTS.PICKER_WIN.value
+            is_picker_loss = round_result == ROUND_RESULTS.PICKER_LOSS.value
+            no_schneider = bool(round_row.get("no_schneider"))
+            no_partner = bool(round_row.get("no_partner"))
+            round_created = round_row.get("created")
+            for player_score in round_row.get(TABLE_NAMES.PLAYERROUNDSCORE.value, []):
+                role = player_score.get("player_role")
+                stats_for_player = bucket(player_score["player_id"])
+                if role == "Picker":
+                    stats_for_player["picker_rounds"] += 1
+                    if is_picker_win:
+                        stats_for_player["picker_wins"] += 1
+                    if no_schneider and is_picker_win:
+                        stats_for_player["picker_schneider_wins"] += 1
+                    if no_schneider and is_picker_loss:
+                        stats_for_player["punching_bag_count"] += 1
+                    if no_partner:
+                        stats_for_player["lone_wolf_count"] += 1
+                        if is_picker_loss:
+                            stats_for_player["overconfident_count"] += 1
+                            last_created = stats_for_player["overconfident_last_created"]
+                            if round_created and (last_created is None or round_created > last_created):
+                                stats_for_player["overconfident_last_created"] = round_created
+                elif role == "Partner":
+                    stats_for_player["partner_rounds"] += 1
+                    if is_picker_win:
+                        stats_for_player["partner_wins"] += 1
+                    if no_schneider and is_picker_loss:
+                        stats_for_player["punching_bag_count"] += 1
+                elif role == "Opponent":
+                    if no_schneider and is_picker_win:
+                        stats_for_player["punching_bag_count"] += 1
+
+    if stats:
+        players_response = (
+            supabase.table(TABLE_NAMES.PLAYERS.value)
+            .select("player_id, player_name")
+            .in_("player_id", list(stats.keys()))
+            .execute()
+        )
+        for row in players_response.data:
+            stats[row["player_id"]]["player_name"] = row["player_name"]
+
+    return stats
+
+
+def _select_holder(badge: BadgeDef, stats: dict[int, dict]) -> dict | None:
+    candidates = [player_stats for player_stats in stats.values() if badge.eligible(player_stats)]
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda player_stats: (
+            badge.value(player_stats),
+            badge.tiebreak_sample(player_stats),
+            *[tiebreaker(player_stats) for tiebreaker in badge.tiebreakers],
+            player_stats["games_played"],
+            -player_stats["player_id"],
+        ),
+    )
+
+
+def recompute_badges() -> None:
+    try:
+        stats = aggregate_player_stats()
+        updated_at = datetime.now(timezone.utc).isoformat()
+        rows = []
+        for badge in BADGE_DEFS:
+            holder = _select_holder(badge, stats)
+            if holder is None:
+                rows.append({
+                    "badge_key": badge.key,
+                    "holder_player_id": None,
+                    "value": None,
+                    "display_value": None,
+                    "sample_size": None,
+                    "updated_at": updated_at,
+                })
+                continue
+            value = badge.value(holder)
+            rows.append({
+                "badge_key": badge.key,
+                "holder_player_id": holder["player_id"],
+                "value": value,
+                "display_value": badge.format(value),
+                "sample_size": int(badge.tiebreak_sample(holder)),
+                "updated_at": updated_at,
+            })
+        supabase.table(TABLE_NAMES.BADGES.value).upsert(rows, on_conflict="badge_key").execute()
+    except Exception:
+        logger.exception("recompute_badges failed")
+
+
+def _game_is_completed(game_id: int) -> bool:
+    response = (
+        supabase.table(TABLE_NAMES.GAMES.value)
+        .select("is_completed")
+        .eq("game_id", game_id)
+        .execute()
+    )
+    return bool(response.data and response.data[0]["is_completed"])
+
+
+@app.on_event("startup")
+def _seed_badges_on_startup():
+    recompute_badges()
+
+
 class GameConnectionManager:
     def __init__(self):
         self.connections: dict[int, set[WebSocket]] = {}
@@ -391,6 +634,7 @@ async def delete_game(game_id, user_id: str = Depends(get_current_user_id)):
         .execute()
     )
     await game_connections.broadcast_list()
+    recompute_badges()
     return response.data
 
 @app.patch("/games/{game_id}/status", tags=["Game Management"])
@@ -403,6 +647,7 @@ async def set_game_status(game_id, is_completed: bool = Body(..., embed=True), u
     )
     await game_connections.broadcast(int(game_id))
     await game_connections.broadcast_list()
+    recompute_badges()
     return response.data[0]
 
 @app.patch("/games/{game_id}/name", tags=["Game Management"])
@@ -428,6 +673,7 @@ async def complete_game(game_id, user_id: str = Depends(get_current_user_id)):
     )
     await game_connections.broadcast(int(game_id))
     await game_connections.broadcast_list()
+    recompute_badges()
     return response.data[0]
 
 @app.get("/rounds/{game_id}", tags=["Game Management"])
@@ -467,6 +713,8 @@ async def create_round(
 
     await game_connections.broadcast(game_id)
     await game_connections.broadcast_list()
+    if _game_is_completed(game_id):
+        recompute_badges()
     return created_round
 
 @app.patch("/rounds/{round_id}", tags=["Game Management"])
@@ -497,6 +745,8 @@ async def update_round(
 
     await game_connections.broadcast(int(updated_round["game_id"]))
     await game_connections.broadcast_list()
+    if _game_is_completed(updated_round["game_id"]):
+        recompute_badges()
     return updated_round
 
 @app.delete("/rounds/{round_id}", tags=["Game Management"])
@@ -532,6 +782,8 @@ async def delete_round(round_id, user_id: str = Depends(get_current_user_id)):
 
     await game_connections.broadcast(int(game_id))
     await game_connections.broadcast_list()
+    if _game_is_completed(game_id):
+        recompute_badges()
     return response.data
 
 @app.get("/players", tags=["Player Management"])
@@ -543,6 +795,43 @@ def get_players():
     )
     enrich_players_with_scoreboard_preferences(response.data)
     return response.data
+
+
+@app.get("/badges", tags=["Badge Management"])
+def get_badges():
+    standings = supabase.table(TABLE_NAMES.BADGES.value).select("*").execute()
+    standings_by_key = {row["badge_key"]: row for row in standings.data}
+    holder_ids = {row["holder_player_id"] for row in standings.data if row.get("holder_player_id")}
+    players_by_id = {}
+    if holder_ids:
+        players_response = (
+            supabase.table(TABLE_NAMES.PLAYERS.value)
+            .select("player_id, player_name")
+            .in_("player_id", list(holder_ids))
+            .execute()
+        )
+        players_by_id = {player["player_id"]: player for player in players_response.data}
+        enrich_players_with_scoreboard_preferences(list(players_by_id.values()))
+
+    result = []
+    for badge in BADGE_DEFS:
+        standing = standings_by_key.get(badge.key)
+        holder_id = standing["holder_player_id"] if standing else None
+        holder = players_by_id.get(holder_id) if holder_id else None
+        result.append({
+            "badge_key": badge.key,
+            "title": badge.title,
+            "description": badge.description,
+            "value": standing["value"] if standing else None,
+            "display_value": standing["display_value"] if standing else None,
+            "sample_size": standing["sample_size"] if standing else None,
+            "holder_player_id": holder_id,
+            "holder_player_name": holder["player_name"] if holder else None,
+            "holder_scoreboard_initials": holder["scoreboard_initials"] if holder else None,
+            "holder_scoreboard_color": holder["scoreboard_color"] if holder else None,
+            "holder_scoreboard_avatar_url": holder["scoreboard_avatar_url"] if holder else None,
+        })
+    return result
 
 @app.post("/players", tags=["Player Management"])
 def create_player(player_name: str, user_id: str = Depends(get_current_user_id)):
