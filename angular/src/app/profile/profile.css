@@ -149,6 +149,115 @@
   font-size: 1.1rem;
 }
 
+.profile-achievement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-achievement {
+  background: #f9fafb;
+  border-left: 4px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.profile-achievement.tier-bronze {
+  border-left-color: var(--tier-bronze);
+}
+
+.profile-achievement.tier-silver {
+  border-left-color: var(--tier-silver);
+}
+
+.profile-achievement.tier-gold {
+  border-left-color: var(--tier-gold);
+}
+
+.profile-achievement__header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.profile-achievement h3,
+.profile-achievement p {
+  margin: 0;
+}
+
+.profile-achievement h3 {
+  color: #1a1a2e;
+  font-size: 0.95rem;
+}
+
+.profile-achievement p {
+  color: #6b7280;
+  font-size: 0.85rem;
+  margin-top: 3px;
+}
+
+.profile-achievement__pips {
+  display: flex;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+.profile-achievement__pip {
+  background: #e5e7eb;
+  border-radius: 50%;
+  height: 12px;
+  width: 12px;
+}
+
+.profile-achievement__pip--earned.tier-bronze {
+  background: var(--tier-bronze);
+}
+
+.profile-achievement__pip--earned.tier-silver {
+  background: var(--tier-silver);
+}
+
+.profile-achievement__pip--earned.tier-gold {
+  background: var(--tier-gold);
+}
+
+.profile-achievement__progress {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.profile-achievement__bar {
+  background: #e5e7eb;
+  border-radius: 3px;
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+}
+
+.profile-achievement__bar-fill {
+  background: #667eea;
+  border-radius: 3px;
+  height: 100%;
+}
+
+.profile-achievement__progress-label {
+  color: #6b7280;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.profile-achievement__complete {
+  color: var(--tier-gold);
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
 .profile-checkbox {
   display: inline-flex;
   align-items: center;

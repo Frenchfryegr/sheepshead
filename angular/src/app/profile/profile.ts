@@ -4,8 +4,10 @@ import { Router } from '@angular/router';
 import { AuthService } from '../auth/auth-service';
 import { GamesService } from '../games/games-service';
 import { BadgesService } from '../badges/badges-service';
+import { AchievementsService } from '../achievements/achievements-service';
 import { ProfileInfo } from '../interfaces/auth';
 import { Badge } from '../interfaces/badge';
+import { PlayerAchievement, PlayerAchievementTier } from '../interfaces/achievement';
 import { Player } from '../interfaces/player';
 
 const MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
@@ -20,6 +22,7 @@ export class Profile implements OnInit {
   private authService = inject(AuthService)
   private gamesService = inject(GamesService)
   private badgesService = inject(BadgesService)
+  private achievementsService = inject(AchievementsService)
   private router = inject(Router)
 
   @ViewChild('ClaimDialog') claimDialog!: ElementRef<HTMLDialogElement>
@@ -42,6 +45,9 @@ export class Profile implements OnInit {
   players = signal<Player[]>([])
   claimError = signal<string | null>(null)
   heldBadges = signal<Badge[]>(this.filterHeldBadges(this.badgesService.badges(), this.profile()))
+  playerAchievements = signal<PlayerAchievement[]>(
+    this.sortAchievements(this.achievementsService.cachedPlayerAchievements(this.profile()?.claimed_player_id))
+  )
 
   ngOnInit() {
     this.loadProfile()
@@ -56,6 +62,7 @@ export class Profile implements OnInit {
       next: (profile) => {
         this.applyProfile(profile)
         this.loadHeldBadges(profile)
+        this.loadPlayerAchievements(profile)
         this.isLoading.set(false)
       },
       error: (err) => {
@@ -167,6 +174,7 @@ export class Profile implements OnInit {
       next: profile => {
         this.applyProfile(profile)
         this.loadHeldBadges(profile)
+        this.loadPlayerAchievements(profile)
       },
       error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not claim player')
     })
@@ -178,6 +186,7 @@ export class Profile implements OnInit {
       next: profile => {
         this.applyProfile(profile)
         this.loadHeldBadges(profile)
+        this.loadPlayerAchievements(profile)
       },
       error: (err) => this.claimError.set(err?.error?.detail ?? 'Could not unclaim player')
     })
@@ -220,5 +229,38 @@ export class Profile implements OnInit {
       .filter(badge => badge.holder_player_id === profile.claimed_player_id)
       // Display order only — the backend registry order (BADGE_DEFS in api/main.py) is left as-is.
       .sort((a, b) => a.title.localeCompare(b.title))
+  }
+
+  private loadPlayerAchievements(profile: ProfileInfo) {
+    const playerId = profile.claimed_player_id
+    if (playerId === null) {
+      this.playerAchievements.set([])
+      return
+    }
+    this.achievementsService.getPlayerAchievements(playerId).subscribe({
+      next: achievements => {
+        this.achievementsService.setPlayerAchievements(playerId, achievements)
+        this.playerAchievements.set(this.sortAchievements(achievements))
+      },
+      error: () => this.playerAchievements.set([]),
+    })
+  }
+
+  private sortAchievements(achievements: PlayerAchievement[]): PlayerAchievement[] {
+    // Display order only — the backend registry order (ACHIEVEMENT_DEFS in api/main.py) is left as-is.
+    return [...achievements].sort((a, b) => a.title.localeCompare(b.title))
+  }
+
+  achievementProgress(achievement: PlayerAchievement): number {
+    if (!achievement.next_tier || achievement.next_tier.threshold <= 0) return 1
+    return Math.min(1, achievement.current_value / achievement.next_tier.threshold)
+  }
+
+  tierTooltip(tier: PlayerAchievementTier): string {
+    if (tier.earned) {
+      const date = tier.earned_at ? new Date(tier.earned_at).toLocaleDateString() : ''
+      return date ? `${tier.tier} — earned ${date}` : `${tier.tier} — earned`
+    }
+    return `${tier.tier} — reach ${tier.display_threshold}`
   }
 }

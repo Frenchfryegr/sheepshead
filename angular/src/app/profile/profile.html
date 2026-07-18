@@ -59,6 +59,55 @@
       </div>
 
       <div class="profile-section">
+        <h2>Achievements</h2>
+        @if (!profile()?.claimed_player_id) {
+          <p class="text-muted">Claim a player to start earning achievements.</p>
+        } @else if (playerAchievements().length === 0) {
+          <p class="text-muted">Loading achievements...</p>
+        } @else {
+          <div class="profile-achievement-list">
+            @for (achievement of playerAchievements(); track achievement.achievement_key) {
+              <div
+                class="profile-achievement"
+                [class.tier-bronze]="achievement.highest_earned_tier === 'bronze'"
+                [class.tier-silver]="achievement.highest_earned_tier === 'silver'"
+                [class.tier-gold]="achievement.highest_earned_tier === 'gold'"
+              >
+                <div class="profile-achievement__header">
+                  <h3>{{ achievement.title }}</h3>
+                  <div class="profile-achievement__pips">
+                    @for (tier of achievement.tiers; track tier.tier) {
+                      <span
+                        class="profile-achievement__pip"
+                        [class.profile-achievement__pip--earned]="tier.earned"
+                        [class.tier-bronze]="tier.tier === 'bronze'"
+                        [class.tier-silver]="tier.tier === 'silver'"
+                        [class.tier-gold]="tier.tier === 'gold'"
+                        [title]="tierTooltip(tier)"
+                      ></span>
+                    }
+                  </div>
+                </div>
+                <p>{{ achievement.description }}</p>
+                @if (achievement.next_tier) {
+                  <div class="profile-achievement__progress">
+                    <div class="profile-achievement__bar">
+                      <div class="profile-achievement__bar-fill" [style.width.%]="achievementProgress(achievement) * 100"></div>
+                    </div>
+                    <span class="profile-achievement__progress-label">
+                      {{ achievement.display_value }} / {{ achievement.next_tier.display_threshold }} to {{ achievement.next_tier.tier }}
+                    </span>
+                  </div>
+                } @else {
+                  <span class="profile-achievement__complete">Gold earned</span>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="profile-section">
         <div class="profile-section__heading">
           <h2>Picture</h2>
           <label class="profile-checkbox">

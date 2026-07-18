@@ -76,9 +76,12 @@ the engine — read it before scanning `main.py` yourself.
   purposes. Never add a per-badge query.
 - `_select_holder(badge, stats)` — picks the winner for one badge via a `max()` over a tuple:
   `(value_or_negated, tiebreak_sample, *tiebreakers, games_played, -player_id)`.
-- `recompute_badges()` — calls `aggregate_player_stats()` once, runs `_select_holder()` for every
-  `BadgeDef`, and upserts the whole `Badges` table. Wrapped in try/except so a badge bug can never
-  break a game-mutation request. Full recompute every time, never incremental.
+- `recompute_badges(stats)` — runs `_select_holder()` for every `BadgeDef` over the stats dict it
+  is handed and upserts the whole `Badges` table. Wrapped in try/except so a badge bug can never
+  break a game-mutation request. Full recompute every time, never incremental. It no longer
+  queries anything itself: `recompute_standings()` calls `aggregate_player_stats()` once and
+  passes the result to both `recompute_badges(stats)` and `recompute_achievements(stats)` — see
+  "🏆 Adding an Achievement" below.
 - `_game_is_completed(game_id)` — guard used before recomputing on a round change.
 - `GET /badges` — the only badge read endpoint; loops `BADGE_DEFS` in order and enriches the
   holder with scoreboard preferences. Fully generic — never needs editing for a new badge unless
@@ -89,7 +92,8 @@ the engine — read it before scanning `main.py` yourself.
 
 The query already pulls, per completed game: `game_id`, roster player IDs
 (`Players_X_Games(player_id)`), and per round: `round_number`, `round_result`, `no_schneider`,
-`no_partner`, `created`, and per player-round-score row: `player_id`, `player_role`, `point_delta`.
+`no_partner`, `no_trick`, `created`, and per player-round-score row: `player_id`, `player_role`,
+`point_delta`.
 **If your badge only needs these fields, no query change is needed at all** — just add counters
 and increment them in the existing loops.
 
@@ -122,7 +126,7 @@ and increment them in the existing loops.
 `partner_wins`, `picker_schneider_wins`, `lone_wolf_count`, `overconfident_count`,
 `overconfident_last_created`, `punching_bag_count`, `icarus_max_lead`, `icarus_final_score`,
 `games_won`, `best_won_score`, `worst_lost_score`, `big_loser_rounds_played`,
-`big_loser_rounds_won`. Check this list before adding a counter — your badge may already be one
+`big_loser_rounds_won`, `leaster_wins`, `no_trick_lone_wins`. Check this list before adding a counter — your badge may already be one
 division away from an existing field (e.g. any new per-game win % badge reuses
 `games_won`/`games_played`; any new all-role round win % badge reuses
 `big_loser_rounds_won`/`big_loser_rounds_played` directly instead of re-deriving from the
@@ -158,11 +162,12 @@ longer does anything for display and would be a no-op end-to-end.
 
 ### Trigger wiring (do not add a new trigger)
 
-`recompute_badges()` already fires on: `complete_game`, `set_game_status` (both directions),
-`delete_game`, and on `create_round`/`update_round`/`delete_round` **only when
-`_game_is_completed()` is true** for that round's game. A new badge needs zero new trigger wiring
-— it's picked up automatically because `recompute_badges()` iterates all of `BADGE_DEFS`. There's
-also a `@app.on_event("startup")` call so standings are correct immediately after a deploy/restart.
+`recompute_standings()` (badges **and** achievements, one shared aggregation pass) already fires
+on: `complete_game`, `set_game_status` (both directions), `delete_game`, and on
+`create_round`/`update_round`/`delete_round` **only when `_game_is_completed()` is true** for that
+round's game. A new badge needs zero new trigger wiring — it's picked up automatically because
+`recompute_badges()` iterates all of `BADGE_DEFS`. There's also a `@app.on_event("startup")` call
+(`_seed_standings_on_startup`) so standings are correct immediately after a deploy/restart.
 
 ### Workflow for a new badge
 
@@ -187,3 +192,60 @@ Only if the badge needs a **response field no existing badge can share** (e.g. s
 `value`/`display_value`/`sample_size`/holder info) — in that case update `GET /badges`'s per-badge
 dict, `angular/src/app/interfaces/badge.ts`, and any template reading the new field, keeping the
 field generic (populated for every badge, not just the new one) rather than badge-specific.
+
+## 🏆 Adding an Achievement
+
+An "achievement" is a fixed milestone **any number of Players can earn** (vs. a badge's single
+holder), with 1–3 tiers among **bronze/silver/gold** at increasing thresholds on one metric.
+Like badges, the system is **registry-driven inside `api/main.py`** — a new achievement is
+almost always a pure-Python change with no migration, no new endpoint, and no frontend change.
+
+### Where everything lives
+
+- `AchievementTier` / `AchievementDef` (dataclasses) + `ACHIEVEMENT_DEFS` (the registry) — in
+  `api/main.py` right after `BADGE_DEFS`. An `AchievementDef` has `key`, `title`, `description`,
+  `metric(stats)` (reads the **same** stats dict `aggregate_player_stats()` builds for badges —
+  same contract, same loops, same counters), `tiers` (ascending thresholds, tier names in
+  bronze→silver→gold order; a one-shot achievement declares a single `("gold", 1)` tier), and
+  optional `format` (defaults to `_count`).
+- `recompute_achievements(stats)` — computes every (player, achievement, tier) whose metric meets
+  the threshold and upserts into `PlayerAchievements` with `ignore_duplicates=True`.
+  **Sticky semantics**: rows are only ever inserted, never updated or deleted — the original
+  `earned_at` is preserved and an earned tier survives later data edits (deleting/un-completing a
+  game does NOT revoke it). Both endpoints treat the DB, not the live metric, as the authority on
+  "earned".
+- `recompute_standings()` — the only orchestrator: one `aggregate_player_stats()` pass feeds both
+  `recompute_badges(stats)` and `recompute_achievements(stats)`. All triggers (and startup
+  seeding) call this — never wire a new trigger for an achievement.
+- `PlayerAchievements` table — one row per (player, achievement, tier), unique on that triple.
+  Definitions/thresholds live only in code.
+- `GET /achievements` — public; iterates `ACHIEVEMENT_DEFS`, returns each def's tier ladder plus
+  earners (highest tier per player, scoreboard-pref-enriched). Generic — never needs editing for
+  a new achievement.
+- `GET /achievements/players/{player_id}` — public; per-player live progress
+  (`current_value`/`display_value`, per-tier `earned`/`earned_at`, `highest_earned_tier`,
+  `next_tier`). Note `current_value` **can be below an earned tier's threshold** (sticky) — the
+  frontend keys "earned" off the flags, never the value.
+- Frontend: `/achievements` page (`angular/src/app/achievements/`) and the profile's
+  Achievements section (`profile.ts`/`profile.html`) both render whatever the API returns and
+  re-sort alphabetically by title — no frontend change for a new achievement. Tier colors are
+  the `--tier-bronze/silver/gold` CSS variables in `angular/src/styles.css`.
+
+### Workflow for a new achievement
+
+1. Get from whoever's asking: title, description, exact metric, and tier thresholds (which of
+   bronze/silver/gold, and the value for each). Don't guess metric semantics.
+2. Check whether the metric is derivable from fields already in `_empty_stats` (see the badge
+   section's list — badges and achievements share it). If not, add counter(s) to
+   `_empty_stats()` and increment them in the correct loop (flat per-round vs. per-game replay —
+   the badge section's guidance applies verbatim). Only touch the `.select(...)` string if a
+   genuinely new DB column is needed (that's how `no_trick` got added).
+3. Append one `AchievementDef` to `ACHIEVEMENT_DEFS`.
+4. Do **not** touch: the `PlayerAchievements` table/migration, either `/achievements` endpoint,
+   `recompute_standings`/triggers, or any frontend file.
+5. Validate with `python -c "import ast; ast.parse(open('api/main.py', encoding='utf-8').read())"`
+   unless asked to run/verify live.
+6. Retiring an achievement: remove its def — its DB rows become inert (endpoints iterate the
+   registry). Optionally clean up its rows manually.
+7. Changing a threshold: fine going **down** (next recompute back-fills newly-qualified players);
+   going **up** does NOT revoke already-earned rows (sticky) — flag that to whoever asked.
