@@ -52,6 +52,10 @@ class BadgeDef:
     # generic games_played/player_id fallback. Empty for every badge except ones that need a
     # bespoke tiebreak chain — leaving this empty preserves the original 4-tuple sort exactly.
     tiebreakers: tuple[Callable[[dict], object], ...] = ()
+    # The selector is otherwise always max()-wins. Set True only for a badge whose metric is
+    # genuinely "smaller is the achievement" — this only affects holder selection, never the
+    # stored/displayed value(), so display formatting is unaffected.
+    lower_is_better: bool = False
 
 
 def _pct(value: float) -> str:
@@ -102,7 +106,7 @@ BADGE_DEFS: list[BadgeDef] = [
     BadgeDef(
         key="lone_wolf",
         title="Lone Wolf",
-        description="Most times going alone (no partner)",
+        description="Most times going alone",
         value=lambda stats: float(stats["lone_wolf_count"]),
         eligible=lambda stats: stats["lone_wolf_count"] >= 1,
         tiebreak_sample=lambda stats: stats["lone_wolf_count"],
@@ -152,6 +156,19 @@ BADGE_DEFS: list[BadgeDef] = [
         format=_pct,
         tiebreakers=(
             lambda stats: stats["best_won_score"] if stats["best_won_score"] is not None else float("-inf"),
+        ),
+    ),
+    BadgeDef(
+        key="biggest_loser",
+        title="Biggest Loser",
+        description="Lowest win % across all categories",
+        value=lambda stats: stats["games_won"] / stats["games_played"],
+        eligible=lambda stats: stats["games_played"] >= 3,
+        tiebreak_sample=lambda stats: stats["games_played"],
+        format=_pct,
+        lower_is_better=True,
+        tiebreakers=(
+            lambda stats: -stats["worst_lost_score"] if stats["worst_lost_score"] is not None else float("-inf"),
         ),
     ),
 ]
@@ -390,6 +407,7 @@ def _empty_stats(player_id: int) -> dict:
         "icarus_final_score": 0,
         "games_won": 0,
         "best_won_score": None,
+        "worst_lost_score": None,
     }
 
 
@@ -489,11 +507,17 @@ def aggregate_player_stats() -> dict[int, dict]:
                         stats_for_player["best_won_score"] = final_score
                     continue
 
+                # Biggest Loser: track the player's worst-ever non-winning final score
+                # (used only as a tiebreak), for every game they didn't win.
+                stats_for_player = bucket(player_id)
+                worst_lost_score = stats_for_player["worst_lost_score"]
+                if worst_lost_score is None or final_score < worst_lost_score:
+                    stats_for_player["worst_lost_score"] = final_score
+
                 # Icarus: largest lead a non-winning roster player held at any point.
                 lead = max_lead[player_id]
                 if lead <= 0:
                     continue
-                stats_for_player = bucket(player_id)
                 current_best = stats_for_player["icarus_max_lead"]
                 if lead > current_best or (lead == current_best and final_score < stats_for_player["icarus_final_score"]):
                     stats_for_player["icarus_max_lead"] = lead
@@ -519,7 +543,7 @@ def _select_holder(badge: BadgeDef, stats: dict[int, dict]) -> dict | None:
     return max(
         candidates,
         key=lambda player_stats: (
-            badge.value(player_stats),
+            -badge.value(player_stats) if badge.lower_is_better else badge.value(player_stats),
             badge.tiebreak_sample(player_stats),
             *[tiebreaker(player_stats) for tiebreaker in badge.tiebreakers],
             player_stats["games_played"],
