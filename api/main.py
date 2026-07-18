@@ -142,6 +142,18 @@ BADGE_DEFS: list[BadgeDef] = [
             lambda stats: -stats["icarus_final_score"],
         ),
     ),
+    BadgeDef(
+        key="chicken_dinner",
+        title="Chicken Dinner",
+        description="Highest win % across all categories",
+        value=lambda stats: stats["games_won"] / stats["games_played"],
+        eligible=lambda stats: stats["games_played"] >= 3,
+        tiebreak_sample=lambda stats: stats["games_played"],
+        format=_pct,
+        tiebreakers=(
+            lambda stats: stats["best_won_score"] if stats["best_won_score"] is not None else float("-inf"),
+        ),
+    ),
 ]
 
 
@@ -376,6 +388,8 @@ def _empty_stats(player_id: int) -> dict:
         "punching_bag_count": 0,
         "icarus_max_lead": 0,
         "icarus_final_score": 0,
+        "games_won": 0,
+        "best_won_score": None,
     }
 
 
@@ -463,14 +477,24 @@ def aggregate_player_stats() -> dict[int, dict]:
             winner_ids = {player_id for player_id, total in running_totals.items() if total == final_max}
 
             for player_id in roster_ids:
+                final_score = running_totals[player_id]
+
+                # Chicken Dinner: count this as a win and track the player's best-ever
+                # winning final score (used only as a tiebreak).
                 if player_id in winner_ids:
+                    stats_for_player = bucket(player_id)
+                    stats_for_player["games_won"] += 1
+                    best_won_score = stats_for_player["best_won_score"]
+                    if best_won_score is None or final_score > best_won_score:
+                        stats_for_player["best_won_score"] = final_score
                     continue
+
+                # Icarus: largest lead a non-winning roster player held at any point.
                 lead = max_lead[player_id]
                 if lead <= 0:
                     continue
                 stats_for_player = bucket(player_id)
                 current_best = stats_for_player["icarus_max_lead"]
-                final_score = running_totals[player_id]
                 if lead > current_best or (lead == current_best and final_score < stats_for_player["icarus_final_score"]):
                     stats_for_player["icarus_max_lead"] = lead
                     stats_for_player["icarus_final_score"] = final_score
