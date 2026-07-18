@@ -20,12 +20,15 @@ export class Badges implements OnInit {
 
   filteredBadges = computed(() => {
     const query = this.searchQuery().trim().toLowerCase()
-    if (!query) return this.badges()
-    return this.badges().filter(badge =>
-      badge.title.toLowerCase().includes(query) ||
-      badge.description.toLowerCase().includes(query) ||
-      (badge.holder_player_name?.toLowerCase().includes(query) ?? false)
-    )
+    const badges = query
+      ? this.badges().filter(badge =>
+          badge.title.toLowerCase().includes(query) ||
+          badge.description.toLowerCase().includes(query) ||
+          (badge.holder_player_name?.toLowerCase().includes(query) ?? false)
+        )
+      : this.badges()
+    // Display order only — the backend registry order (BADGE_DEFS in api/main.py) is left as-is.
+    return [...badges].sort((a, b) => a.title.localeCompare(b.title))
   })
 
   ngOnInit() {

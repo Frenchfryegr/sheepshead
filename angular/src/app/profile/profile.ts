@@ -216,6 +216,9 @@ export class Profile implements OnInit {
 
   private filterHeldBadges(badges: Badge[], profile: ProfileInfo | null): Badge[] {
     if (!profile || profile.claimed_player_id === null) return []
-    return badges.filter(badge => badge.holder_player_id === profile.claimed_player_id)
+    return badges
+      .filter(badge => badge.holder_player_id === profile.claimed_player_id)
+      // Display order only — the backend registry order (BADGE_DEFS in api/main.py) is left as-is.
+      .sort((a, b) => a.title.localeCompare(b.title))
   }
 }
