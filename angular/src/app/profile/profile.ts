@@ -24,28 +24,33 @@ export class Profile implements OnInit {
 
   @ViewChild('ClaimDialog') claimDialog!: ElementRef<HTMLDialogElement>
 
-  profile = signal<ProfileInfo | null>(null)
-  username = signal('')
-  contactEmail = signal('')
-  scoreboardInitials = signal('')
-  scoreboardColor = signal('')
-  showAvatarOnScoreboard = signal(false)
+  // Seeded from AuthService/BadgesService's caches (both root singletons) so this component
+  // shows the last-known profile immediately if it's destroyed and recreated on route
+  // navigation, instead of blanking out to "Loading profile..." while it refetches.
+  profile = signal<ProfileInfo | null>(this.authService.profile())
+  username = signal(this.profile()?.username ?? '')
+  contactEmail = signal(this.profile()?.contact_email ?? '')
+  scoreboardInitials = signal(this.profile()?.scoreboard_initials ?? '')
+  scoreboardColor = signal(this.profile()?.scoreboard_color ?? '')
+  showAvatarOnScoreboard = signal(this.profile()?.show_avatar_on_scoreboard ?? false)
   errorMessage = signal<string | null>(null)
   successMessage = signal<string | null>(null)
-  isLoading = signal(true)
+  isLoading = signal(!this.profile())
   isSaving = signal(false)
   isUploading = signal(false)
   isDeletingPicture = signal(false)
   players = signal<Player[]>([])
   claimError = signal<string | null>(null)
-  heldBadges = signal<Badge[]>([])
+  heldBadges = signal<Badge[]>(this.filterHeldBadges(this.badgesService.badges(), this.profile()))
 
   ngOnInit() {
     this.loadProfile()
   }
 
   loadProfile() {
-    this.isLoading.set(true)
+    // Only show the loading state on a genuinely first load; if we already have cached
+    // data (from a prior visit this session), refresh it in the background instead.
+    if (!this.profile()) this.isLoading.set(true)
     this.errorMessage.set(null)
     this.authService.getProfile().subscribe({
       next: (profile) => {
@@ -201,8 +206,16 @@ export class Profile implements OnInit {
       return
     }
     this.badgesService.getBadges().subscribe({
-      next: badges => this.heldBadges.set(badges.filter(badge => badge.holder_player_id === profile.claimed_player_id)),
+      next: badges => {
+        this.badgesService.setBadges(badges)
+        this.heldBadges.set(this.filterHeldBadges(badges, profile))
+      },
       error: () => this.heldBadges.set([]),
     })
+  }
+
+  private filterHeldBadges(badges: Badge[], profile: ProfileInfo | null): Badge[] {
+    if (!profile || profile.claimed_player_id === null) return []
+    return badges.filter(badge => badge.holder_player_id === profile.claimed_player_id)
   }
 }
