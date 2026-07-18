@@ -1,5 +1,6 @@
-import { AfterViewInit, Component, computed, HostListener, inject, OnDestroy, signal, ViewChild, ElementRef } from '@angular/core';
-import { DatePipe, formatDate } from '@angular/common';
+import { AfterViewInit, Component, computed, HostListener, inject, OnDestroy, PLATFORM_ID, signal, ViewChild, ElementRef } from '@angular/core';
+import { DatePipe, formatDate, isPlatformBrowser } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { GamesService } from '../games-service';
 import { GameRealtimeService } from '../game-realtime-service';
@@ -46,6 +47,8 @@ export class Games implements AfterViewInit, OnDestroy {
   private gamesService = inject(GamesService)
   private gameRealtime = inject(GameRealtimeService)
   protected authService = inject(AuthService)
+  private route = inject(ActivatedRoute)
+  private platformId = inject(PLATFORM_ID)
   // Owned by GamesService (not local) so the last-known list survives this component being
   // destroyed and recreated on route navigation (e.g. to /profile or /badges and back).
   games = this.gamesService.games
@@ -59,6 +62,10 @@ export class Games implements AfterViewInit, OnDestroy {
   })
 
   selectedGame: Game | null = null
+  // True only when the completed-game dialog was auto-opened via the /latest route, so the
+  // dialog can show a "Latest Game" header. Reset whenever that dialog closes.
+  isLatestGameView = signal(false)
+  private pendingOpenLatest = false
 
   @ViewChild('ShowGameRounds') showGameRoundsDialog!: ElementRef<HTMLDialogElement>
   @ViewChild('GameWizardDialog') gameWizardDialog!: ElementRef<HTMLDialogElement>
@@ -80,7 +87,10 @@ export class Games implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    this.showGameRoundsDialog.nativeElement.addEventListener('close', () => this.unlockBodyScroll())
+    this.showGameRoundsDialog.nativeElement.addEventListener('close', () => {
+      this.unlockBodyScroll()
+      this.isLatestGameView.set(false)
+    })
     this.gameWizardDialog.nativeElement.addEventListener('close', () => this.unlockBodyScroll())
   }
 
@@ -162,6 +172,11 @@ export class Games implements AfterViewInit, OnDestroy {
   private realtimeSubscriptions = new Subscription()
 
   constructor() {
+    // The /latest route reuses this component but auto-opens the most recently completed
+    // game (browser only — showModal/scroll locking can't run during SSR prerender).
+    if (this.route.snapshot.data['openLatest'] && isPlatformBrowser(this.platformId)) {
+      this.pendingOpenLatest = true
+    }
     this.refreshGames()
     this.realtimeSubscriptions.add(this.gameRealtime.updates.subscribe(() => this.refetchCurrentGame()))
     this.realtimeSubscriptions.add(this.gameRealtime.listUpdates.subscribe(() => this.refreshGames()))
@@ -197,7 +212,25 @@ export class Games implements AfterViewInit, OnDestroy {
   }
 
   refreshGames() {
-    this.gamesService.getGames().subscribe(games => this.gamesService.setGames(games))
+    this.gamesService.getGames().subscribe(games => {
+      this.gamesService.setGames(games)
+      // One-shot: after the first load on the /latest route, open the newest completed game.
+      if (this.pendingOpenLatest) {
+        this.pendingOpenLatest = false
+        this.openLatestCompletedGame(games)
+      }
+    })
+  }
+
+  private openLatestCompletedGame(games: Game[]) {
+    const completed = games.filter(game => game.is_completed)
+    if (completed.length === 0) return
+    const latest = completed.reduce((newest, game) =>
+      new Date(this.normalizeDatetime(game.game_datetime)).getTime() >
+      new Date(this.normalizeDatetime(newest.game_datetime)).getTime() ? game : newest
+    )
+    this.isLatestGameView.set(true)
+    this.selectGame(latest)
   }
 
   toggleDateSort() {

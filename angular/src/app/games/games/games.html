@@ -111,6 +111,9 @@
 <dialog #ShowGameRounds class="dialog dialog-completed" (click)="onGameRoundsBackdropClick($event)">
   <div class="dialog-header">
     <div class="dialog-header__title">
+      @if (isLatestGameView()) {
+        <span class="dialog-header__latest">Latest Game</span>
+      }
       @if (editingSelectedGameName()) {
         <input
           #selectedGameNameField
