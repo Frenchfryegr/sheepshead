@@ -5,5 +5,6 @@ export const environment = {
     players: "players",
     auth: "auth",
     badges: "badges",
-    achievements: "achievements"
+    achievements: "achievements",
+    statistics: "statistics"
 };

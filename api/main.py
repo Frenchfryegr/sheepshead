@@ -271,6 +271,107 @@ ACHIEVEMENT_DEFS: list[AchievementDef] = [
 ]
 
 
+STAT_SPLITS = ("three_hand", "five_hand")  # partition of all games; overall = sum of both
+
+
+@dataclass(frozen=True)
+class StatDef:
+    key: str
+    title: str
+    description: str
+    value: Callable[[dict], float | None]  # None when the denominator is 0 (no sample)
+    sample: Callable[[dict], int]          # denominator/count: display detail + eligibility
+    min_sample: int                        # leaderboard gate, applied per split's own sample
+    format: Callable[[float], str]
+    # Ratio stats only: the numerator (e.g. wins), so the frontend can show a "(num/den)"
+    # fraction alongside the percentage. None for count stats (no fraction to show).
+    numerator: Callable[[dict], int] | None = None
+
+
+def _ratio(numerator_key: str, denominator_key: str) -> Callable[[dict], float | None]:
+    def compute(bucket: dict) -> float | None:
+        denominator = bucket[denominator_key]
+        if denominator == 0:
+            return None
+        return bucket[numerator_key] / denominator
+    return compute
+
+
+STAT_DEFS: list[StatDef] = [
+    StatDef(
+        key="picker_win_pct",
+        title="Picker Win %",
+        description="Rounds won as the picker",
+        value=_ratio("picker_wins", "picker_rounds"),
+        sample=lambda bucket: bucket["picker_rounds"],
+        min_sample=5,
+        format=_pct,
+        numerator=lambda bucket: bucket["picker_wins"],
+    ),
+    StatDef(
+        key="partner_win_pct",
+        title="Partner Win %",
+        description="Rounds won as the partner",
+        value=_ratio("partner_wins", "partner_rounds"),
+        sample=lambda bucket: bucket["partner_rounds"],
+        min_sample=3,
+        format=_pct,
+        numerator=lambda bucket: bucket["partner_wins"],
+    ),
+    StatDef(
+        key="game_win_pct",
+        title="Game Win %",
+        description="Games finished with the highest score",
+        value=_ratio("games_won", "games_played"),
+        sample=lambda bucket: bucket["games_played"],
+        min_sample=3,
+        format=_pct,
+        numerator=lambda bucket: bucket["games_won"],
+    ),
+    StatDef(
+        key="round_win_pct",
+        title="Round Win %",
+        description="Rounds won in any role",
+        value=_ratio("rounds_won", "rounds_played"),
+        sample=lambda bucket: bucket["rounds_played"],
+        min_sample=10,
+        format=_pct,
+        numerator=lambda bucket: bucket["rounds_won"],
+    ),
+    StatDef(
+        key="leaster_win_pct",
+        title="Leaster Win %",
+        description="Leasters won",
+        value=_ratio("leaster_wins", "leaster_rounds"),
+        sample=lambda bucket: bucket["leaster_rounds"],
+        min_sample=3,
+        format=_pct,
+        numerator=lambda bucket: bucket["leaster_wins"],
+    ),
+    StatDef(
+        key="games_played",
+        title="Games Played",
+        description="Completed games played",
+        value=lambda bucket: float(bucket["games_played"]) if bucket["games_played"] else None,
+        sample=lambda bucket: bucket["games_played"],
+        min_sample=1,
+        format=_count,
+    ),
+    StatDef(
+        key="games_won",
+        title="Games Won",
+        description="Completed games won",
+        value=lambda bucket: float(bucket["games_won"]) if bucket["games_played"] else None,
+        sample=lambda bucket: bucket["games_played"],
+        min_sample=1,
+        format=_count,
+    ),
+]
+
+
+STAT_SCOPES = ("overall",) + STAT_SPLITS  # "overall", "three_hand", "five_hand"
+
+
 class ProfileUpdate(BaseModel):
     username: str | None = None
     contact_email: str | None = None
@@ -286,6 +387,7 @@ tags_metadata = [
     {"name": "Auth", "description": "accounts, login, and player claiming"},
     {"name": "Badge Management", "description": "badge standings"},
     {"name": "Achievement Management", "description": "milestone achievements"},
+    {"name": "Statistics", "description": "player statistics and leaderboards"},
 
 ]
 
@@ -487,10 +589,30 @@ def enrich_players_with_scoreboard_preferences(players: list[dict]) -> None:
         player["scoreboard_avatar_url"] = preference.get("scoreboard_avatar_url")
 
 
+def _empty_stat_bucket() -> dict:
+    return {
+        "picker_rounds": 0, "picker_wins": 0,
+        "partner_rounds": 0, "partner_wins": 0,
+        "rounds_played": 0, "rounds_won": 0,   # all roles, same rules as big_loser_*
+        "leaster_rounds": 0, "leaster_wins": 0,
+        "games_played": 0, "games_won": 0,
+    }
+
+
+def _merged_bucket(stats_for_player: dict) -> dict:
+    # Overall = sum of the two split buckets (they partition all games).
+    merged = _empty_stat_bucket()
+    for split in STAT_SPLITS:
+        for key, count in stats_for_player["by_split"][split].items():
+            merged[key] += count
+    return merged
+
+
 def _empty_stats(player_id: int) -> dict:
     return {
         "player_id": player_id,
         "player_name": "",
+        "by_split": {split: _empty_stat_bucket() for split in STAT_SPLITS},
         "games_played": 0,
         "picker_rounds": 0,
         "picker_wins": 0,
@@ -517,7 +639,7 @@ def aggregate_player_stats() -> dict[int, dict]:
     response = (
         supabase.table(TABLE_NAMES.GAMES.value)
         .select(
-            f"game_id, {TABLE_NAMES.PLAYERSXGAMES.value}(player_id), "
+            f"game_id, num_players, {TABLE_NAMES.PLAYERSXGAMES.value}(player_id), "
             f"{TABLE_NAMES.ROUNDS.value}(round_number, round_result, no_schneider, no_partner, no_trick, created, "
             f"{TABLE_NAMES.PLAYERROUNDSCORE.value}(player_id, player_role, point_delta))"
         )
@@ -532,8 +654,12 @@ def aggregate_player_stats() -> dict[int, dict]:
         return stats[player_id]
 
     for game in response.data:
+        split_key = "five_hand" if game.get("num_players") == 5 else "three_hand"  # 3 AND 4 → three_hand
+
         for player_game in game.get(TABLE_NAMES.PLAYERSXGAMES.value, []):
-            bucket(player_game["player_id"])["games_played"] += 1
+            player_bucket = bucket(player_game["player_id"])
+            player_bucket["games_played"] += 1
+            player_bucket["by_split"][split_key]["games_played"] += 1
 
         for round_row in game.get(TABLE_NAMES.ROUNDS.value, []):
             round_result = round_row.get("round_result")
@@ -546,12 +672,17 @@ def aggregate_player_stats() -> dict[int, dict]:
             for player_score in round_row.get(TABLE_NAMES.PLAYERROUNDSCORE.value, []):
                 role = player_score.get("player_role")
                 stats_for_player = bucket(player_score["player_id"])
+                split_bucket = stats_for_player["by_split"][split_key]
                 if role == "Picker":
                     stats_for_player["picker_rounds"] += 1
                     stats_for_player["big_loser_rounds_played"] += 1
+                    split_bucket["picker_rounds"] += 1
+                    split_bucket["rounds_played"] += 1
                     if is_picker_win:
                         stats_for_player["picker_wins"] += 1
                         stats_for_player["big_loser_rounds_won"] += 1
+                        split_bucket["picker_wins"] += 1
+                        split_bucket["rounds_won"] += 1
                     if no_schneider and is_picker_win:
                         stats_for_player["picker_schneider_wins"] += 1
                     if no_schneider and is_picker_loss:
@@ -568,23 +699,35 @@ def aggregate_player_stats() -> dict[int, dict]:
                 elif role == "Partner":
                     stats_for_player["partner_rounds"] += 1
                     stats_for_player["big_loser_rounds_played"] += 1
+                    split_bucket["partner_rounds"] += 1
+                    split_bucket["rounds_played"] += 1
                     if is_picker_win:
                         stats_for_player["partner_wins"] += 1
                         stats_for_player["big_loser_rounds_won"] += 1
+                        split_bucket["partner_wins"] += 1
+                        split_bucket["rounds_won"] += 1
                     if no_schneider and is_picker_loss:
                         stats_for_player["punching_bag_count"] += 1
                 elif role == "Opponent":
                     stats_for_player["big_loser_rounds_played"] += 1
+                    split_bucket["rounds_played"] += 1
                     if is_picker_loss:
                         stats_for_player["big_loser_rounds_won"] += 1
+                        split_bucket["rounds_won"] += 1
                     if no_schneider and is_picker_win:
                         stats_for_player["punching_bag_count"] += 1
                 elif role == "Leaster Winner":
                     stats_for_player["big_loser_rounds_played"] += 1
                     stats_for_player["big_loser_rounds_won"] += 1
                     stats_for_player["leaster_wins"] += 1
+                    split_bucket["rounds_played"] += 1
+                    split_bucket["rounds_won"] += 1
+                    split_bucket["leaster_rounds"] += 1
+                    split_bucket["leaster_wins"] += 1
                 elif role == "Leaster Loser":
                     stats_for_player["big_loser_rounds_played"] += 1
+                    split_bucket["rounds_played"] += 1
+                    split_bucket["leaster_rounds"] += 1
 
         # Icarus: replay the game's rounds in order to find the largest lead any
         # non-winning roster player held over the rest of the table at any point.
@@ -620,6 +763,7 @@ def aggregate_player_stats() -> dict[int, dict]:
                 if player_id in winner_ids:
                     stats_for_player = bucket(player_id)
                     stats_for_player["games_won"] += 1
+                    stats_for_player["by_split"][split_key]["games_won"] += 1
                     best_won_score = stats_for_player["best_won_score"]
                     if best_won_score is None or final_score > best_won_score:
                         stats_for_player["best_won_score"] = final_score
@@ -1191,6 +1335,94 @@ def get_player_achievements(player_id: int):
             "tiers": tiers,
             "highest_earned_tier": highest_earned_tier,
             "next_tier": next_tier,
+        })
+    return result
+
+
+@app.get("/statistics", tags=["Statistics"])
+def get_statistics():
+    stats = aggregate_player_stats()
+
+    # One enriched player-info dict per player, shared by every leaderboard entry.
+    players_info = {
+        player_id: {
+            "player_id": player_id,
+            "player_name": player_stats["player_name"],
+        }
+        for player_id, player_stats in stats.items()
+    }
+    enrich_players_with_scoreboard_preferences(list(players_info.values()))
+
+    # Overall is derived by summing the split buckets — precompute once per player.
+    merged_by_player = {player_id: _merged_bucket(player_stats) for player_id, player_stats in stats.items()}
+
+    def bucket_for(player_id: int, player_stats: dict, scope: str) -> dict:
+        if scope == "overall":
+            return merged_by_player[player_id]
+        return player_stats["by_split"][scope]
+
+    result = []
+    for stat in STAT_DEFS:
+        leaderboards = {}
+        for scope in STAT_SCOPES:
+            entries = []
+            for player_id, player_stats in stats.items():
+                bucket = bucket_for(player_id, player_stats, scope)
+                sample = stat.sample(bucket)
+                if sample < stat.min_sample:
+                    continue
+                value = stat.value(bucket)
+                if value is None:
+                    continue
+                entries.append({
+                    **players_info[player_id],
+                    "value": value,
+                    "display_value": stat.format(value),
+                    "sample_size": sample,
+                    "numerator": stat.numerator(bucket) if stat.numerator else None,
+                })
+            entries.sort(key=lambda entry: (
+                -entry["value"],
+                -entry["sample_size"],
+                -stats[entry["player_id"]]["games_played"],
+                entry["player_id"],
+            ))
+            for rank, entry in enumerate(entries, start=1):
+                entry["rank"] = rank
+            leaderboards[scope] = entries
+        result.append({
+            "stat_key": stat.key,
+            "title": stat.title,
+            "description": stat.description,
+            "min_sample": stat.min_sample,
+            "leaderboards": leaderboards,
+        })
+    return result
+
+
+@app.get("/statistics/players/{player_id}", tags=["Statistics"])
+def get_player_statistics(player_id: int):
+    player_stats = aggregate_player_stats().get(player_id) or _empty_stats(player_id)
+    merged = _merged_bucket(player_stats)
+    result = []
+    for stat in STAT_DEFS:
+        scopes = {}
+        for scope in STAT_SCOPES:
+            bucket = merged if scope == "overall" else player_stats["by_split"][scope]
+            value = stat.value(bucket)
+            scopes[scope] = {
+                "value": value,
+                "display_value": stat.format(value) if value is not None else None,
+                "sample_size": stat.sample(bucket),
+                "numerator": stat.numerator(bucket) if stat.numerator else None,
+            }
+        result.append({
+            "stat_key": stat.key,
+            "title": stat.title,
+            "description": stat.description,
+            "overall": scopes["overall"],
+            "three_hand": scopes["three_hand"],
+            "five_hand": scopes["five_hand"],
         })
     return result
 
