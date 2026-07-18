@@ -1,8 +1,4 @@
 <main class="profile-page">
-  <div class="profile-page__header">
-    <button class="btn btn-secondary" routerLink="/">Back to Games</button>
-  </div>
-
   @if (isLoading()) {
     <div class="profile-panel">
       <p class="text-muted">Loading profile...</p>
@@ -17,7 +13,7 @@
             <span>{{ fallbackInitials() }}</span>
           }
         </div>
-        <div>
+        <div class="profile-panel__identity">
           <h1>{{ profile()?.username }}</h1>
           @if (profile()?.claimed_player_name) {
             <p class="profile-playing-as">
@@ -28,6 +24,7 @@
             <button class="profile-claimed-player" type="button" (click)="openClaimDialog()">No player claimed</button>
           }
         </div>
+        <button class="btn btn-secondary profile-logout" type="button" (click)="logout()">Log Out</button>
       </div>
 
       @if (errorMessage()) {

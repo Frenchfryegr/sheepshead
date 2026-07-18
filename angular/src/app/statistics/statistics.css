@@ -9,7 +9,7 @@
   align-items: center;
   display: flex;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 5px;
 }
 
 .statistics-page h1,
@@ -185,6 +185,7 @@
 @media (max-width: 640px) {
   .statistics-page {
     padding: 12px;
+    padding-top: 0px;
   }
 
   .statistics-grid {
