@@ -87,7 +87,7 @@ BADGE_DEFS: list[BadgeDef] = [
     ),
     BadgeDef(
         key="the_sidekick",
-        title="The Sidekick",
+        title="Sidekick",
         description="Highest partner win %",
         value=lambda stats: stats["partner_wins"] / stats["partner_rounds"],
         eligible=lambda stats: stats["partner_rounds"] >= 3,
@@ -149,7 +149,7 @@ BADGE_DEFS: list[BadgeDef] = [
     BadgeDef(
         key="chicken_dinner",
         title="Chicken Dinner",
-        description="Highest win % across all categories",
+        description="Highest Game win %",
         value=lambda stats: stats["games_won"] / stats["games_played"],
         eligible=lambda stats: stats["games_played"] >= 3,
         tiebreak_sample=lambda stats: stats["games_played"],
@@ -161,7 +161,7 @@ BADGE_DEFS: list[BadgeDef] = [
     BadgeDef(
         key="biggest_loser",
         title="Biggest Loser",
-        description="Lowest win % across all categories",
+        description="Lowest Game win %",
         value=lambda stats: stats["games_won"] / stats["games_played"],
         eligible=lambda stats: stats["games_played"] >= 3,
         tiebreak_sample=lambda stats: stats["games_played"],
@@ -170,6 +170,25 @@ BADGE_DEFS: list[BadgeDef] = [
         tiebreakers=(
             lambda stats: -stats["worst_lost_score"] if stats["worst_lost_score"] is not None else float("-inf"),
         ),
+    ),
+    BadgeDef(
+        key="big_loser",
+        title="Big Loser",
+        description="Lowest Round win % of all types",
+        value=lambda stats: stats["big_loser_rounds_won"] / stats["big_loser_rounds_played"],
+        eligible=lambda stats: stats["big_loser_rounds_played"] >= 10,
+        tiebreak_sample=lambda stats: stats["big_loser_rounds_played"],
+        format=_pct,
+        lower_is_better=True,
+    ),
+    BadgeDef(
+        key="always_finds_a_way",
+        title="Always Finds a Way",
+        description="Highest Round win % of all types",
+        value=lambda stats: stats["big_loser_rounds_won"] / stats["big_loser_rounds_played"],
+        eligible=lambda stats: stats["big_loser_rounds_played"] >= 10,
+        tiebreak_sample=lambda stats: stats["big_loser_rounds_played"],
+        format=_pct,
     ),
 ]
 
@@ -408,6 +427,8 @@ def _empty_stats(player_id: int) -> dict:
         "games_won": 0,
         "best_won_score": None,
         "worst_lost_score": None,
+        "big_loser_rounds_played": 0,
+        "big_loser_rounds_won": 0,
     }
 
 
@@ -445,8 +466,10 @@ def aggregate_player_stats() -> dict[int, dict]:
                 stats_for_player = bucket(player_score["player_id"])
                 if role == "Picker":
                     stats_for_player["picker_rounds"] += 1
+                    stats_for_player["big_loser_rounds_played"] += 1
                     if is_picker_win:
                         stats_for_player["picker_wins"] += 1
+                        stats_for_player["big_loser_rounds_won"] += 1
                     if no_schneider and is_picker_win:
                         stats_for_player["picker_schneider_wins"] += 1
                     if no_schneider and is_picker_loss:
@@ -460,13 +483,23 @@ def aggregate_player_stats() -> dict[int, dict]:
                                 stats_for_player["overconfident_last_created"] = round_created
                 elif role == "Partner":
                     stats_for_player["partner_rounds"] += 1
+                    stats_for_player["big_loser_rounds_played"] += 1
                     if is_picker_win:
                         stats_for_player["partner_wins"] += 1
+                        stats_for_player["big_loser_rounds_won"] += 1
                     if no_schneider and is_picker_loss:
                         stats_for_player["punching_bag_count"] += 1
                 elif role == "Opponent":
+                    stats_for_player["big_loser_rounds_played"] += 1
+                    if is_picker_loss:
+                        stats_for_player["big_loser_rounds_won"] += 1
                     if no_schneider and is_picker_win:
                         stats_for_player["punching_bag_count"] += 1
+                elif role == "Leaster Winner":
+                    stats_for_player["big_loser_rounds_played"] += 1
+                    stats_for_player["big_loser_rounds_won"] += 1
+                elif role == "Leaster Loser":
+                    stats_for_player["big_loser_rounds_played"] += 1
 
         # Icarus: replay the game's rounds in order to find the largest lead any
         # non-winning roster player held over the rest of the table at any point.

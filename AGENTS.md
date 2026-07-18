@@ -64,9 +64,11 @@ the engine — read it before scanning `main.py` yourself.
   `eligible()`, `tiebreak_sample()`, `format()`, plus two opt-in extension fields explained below:
   `tiebreakers` (tuple of extra tiebreak lambdas, default `()`) and `lower_is_better` (bool,
   default `False`).
-- `BADGE_DEFS` — the ordered list of all `BadgeDef`s. **List order = API and UI display order.**
-  Currently: `just_plain_good`, `the_sidekick`, `dominator`, `lone_wolf`, `overconfident`,
-  `punching_bag`, `icarus`, `chicken_dinner`, `biggest_loser`.
+- `BADGE_DEFS` — the ordered list of all `BadgeDef`s. **List order is the backend/API order**;
+  the frontend re-sorts alphabetically by title for display (see "Frontend display order" below),
+  so `BADGE_DEFS` order is otherwise only cosmetic to `GET /badges`'s raw JSON order. Currently:
+  `just_plain_good`, `the_sidekick`, `dominator`, `lone_wolf`, `overconfident`, `punching_bag`,
+  `icarus`, `chicken_dinner`, `biggest_loser`, `big_loser`, `always_finds_a_way`.
 - `_empty_stats(player_id)` — the zeroed per-player stats dict shape. Every counter a badge reads
   must be initialized here.
 - `aggregate_player_stats()` — the **single** query + single pass that builds one stats dict per
@@ -94,11 +96,15 @@ and increment them in the existing loops.
 ### Two loops per game — know which one your badge belongs in
 
 1. **Flat per-round loop** (iterates `PlayerRoundScore` rows in no particular order, one branch per
-   `role in {"Picker", "Partner", "Opponent"}`). Use this for anything countable from a single
-   round in isolation — win/loss counts, no-schneider/no-partner flags, streak-free tallies. This
-   is where `picker_rounds`, `picker_wins`, `partner_rounds`, `partner_wins`,
-   `picker_schneider_wins`, `lone_wolf_count`, `overconfident_count`, `punching_bag_count` are
-   computed.
+   `role in {"Picker", "Partner", "Opponent", "Leaster Winner", "Leaster Loser"}`; `"Dealer"` rows
+   — the 4-player sit-out role, `point_delta: 0` — are never counted as a round played by any
+   badge and have no branch). Use this for anything countable from a single round in isolation —
+   win/loss counts, no-schneider/no-partner flags, streak-free tallies. This is where
+   `picker_rounds`, `picker_wins`, `partner_rounds`, `partner_wins`, `picker_schneider_wins`,
+   `lone_wolf_count`, `overconfident_count`, `punching_bag_count`, and
+   `big_loser_rounds_played`/`big_loser_rounds_won` are computed. A round "win" depends on role:
+   Picker/Partner win on `round_result == 'Picker Win'`, Opponent wins on `'Picker Loss'`, and
+   `Leaster Winner`/`Leaster Loser` are unconditional (the role itself is the outcome).
 2. **Per-game replay loop** (rounds sorted by `round_number`, maintains a `running_totals` dict per
    roster player, computes `winner_ids` via the tie-inclusive "highest final total" rule — same
    rule the frontend's `getGameWinnerName()` in `games.ts` uses). Use this for anything that needs
@@ -115,9 +121,12 @@ and increment them in the existing loops.
 `player_id`, `player_name`, `games_played`, `picker_rounds`, `picker_wins`, `partner_rounds`,
 `partner_wins`, `picker_schneider_wins`, `lone_wolf_count`, `overconfident_count`,
 `overconfident_last_created`, `punching_bag_count`, `icarus_max_lead`, `icarus_final_score`,
-`games_won`, `best_won_score`, `worst_lost_score`. Check this list before adding a counter — your
-badge may already be one division away from an existing field (e.g. any new "win %" badge over
-picker/partner/whole-game reuses `*_wins`/`*_rounds` or `games_won`/`games_played` directly).
+`games_won`, `best_won_score`, `worst_lost_score`, `big_loser_rounds_played`,
+`big_loser_rounds_won`. Check this list before adding a counter — your badge may already be one
+division away from an existing field (e.g. any new per-game win % badge reuses
+`games_won`/`games_played`; any new all-role round win % badge reuses
+`big_loser_rounds_won`/`big_loser_rounds_played` directly instead of re-deriving from the
+role-specific counters).
 
 ### Tiebreak extension points (already built, don't reinvent)
 
@@ -137,6 +146,15 @@ picker/partner/whole-game reuses `*_wins`/`*_rounds` or `games_won`/`games_playe
   `_select_holder`'s sort key; `value()`'s return value (and therefore the stored/displayed
   percentage) is untouched, so the display always shows the true metric, never a negated one.
   Never negate inside `value()` itself for this reason.
+
+### Frontend display order (alphabetical, not registry order)
+
+`GET /badges` returns badges in `BADGE_DEFS` order, but both frontend surfaces re-sort by `title`
+(`localeCompare`) before rendering: `Badges.filteredBadges` (`angular/src/app/badges/badges.ts`)
+for the `/badges` page, and `Profile.filterHeldBadges` (`angular/src/app/profile/profile.ts`) for
+the held-badges section on `/profile`. **A new badge needs no frontend change for this** — it's
+sorted in automatically by title. Don't reorder `BADGE_DEFS` to influence display order; it no
+longer does anything for display and would be a no-op end-to-end.
 
 ### Trigger wiring (do not add a new trigger)
 
