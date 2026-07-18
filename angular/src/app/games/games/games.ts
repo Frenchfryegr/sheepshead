@@ -1,5 +1,6 @@
-import { AfterViewInit, Component, computed, HostListener, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { AfterViewInit, Component, computed, HostListener, inject, OnDestroy, signal, ViewChild, ElementRef } from '@angular/core';
 import { DatePipe, formatDate } from '@angular/common';
+import { Subscription } from 'rxjs';
 import { GamesService } from '../games-service';
 import { GameRealtimeService } from '../game-realtime-service';
 import { AuthService } from '../../auth/auth-service';
@@ -41,12 +42,13 @@ type SortDirection = 'asc' | 'desc'
   templateUrl: './games.html',
   styleUrl: './games.css',
 })
-export class Games implements AfterViewInit {
+export class Games implements AfterViewInit, OnDestroy {
   private gamesService = inject(GamesService)
   private gameRealtime = inject(GameRealtimeService)
   protected authService = inject(AuthService)
-  private gamesSignal = signal<Game[]>([])
-  games = this.gamesSignal.asReadonly()
+  // Owned by GamesService (not local) so the last-known list survives this component being
+  // destroyed and recreated on route navigation (e.g. to /profile or /badges and back).
+  games = this.gamesService.games
 
   sortColumn = signal<GameSortColumn>('game_datetime')
   sortDirection = signal<SortDirection>('desc')
@@ -153,11 +155,21 @@ export class Games implements AfterViewInit {
     return this.currentRoundNumber()
   })
 
+  // GameRealtimeService is a root singleton whose sockets outlive this component (the list
+  // socket in particular stays connected across navigation, by design — see refreshGames()).
+  // These subscriptions must be torn down in ngOnDestroy, or every remount of this component
+  // stacks another live callback onto the same long-lived Subjects.
+  private realtimeSubscriptions = new Subscription()
+
   constructor() {
     this.refreshGames()
-    this.gameRealtime.updates.subscribe(() => this.refetchCurrentGame())
-    this.gameRealtime.listUpdates.subscribe(() => this.refreshGames())
+    this.realtimeSubscriptions.add(this.gameRealtime.updates.subscribe(() => this.refetchCurrentGame()))
+    this.realtimeSubscriptions.add(this.gameRealtime.listUpdates.subscribe(() => this.refreshGames()))
     this.gameRealtime.connectList()
+  }
+
+  ngOnDestroy() {
+    this.realtimeSubscriptions.unsubscribe()
   }
 
   private refetchCurrentGame() {
@@ -165,7 +177,7 @@ export class Games implements AfterViewInit {
     if (!gameId) return
     const previousRoundCount = this.roundHistory().length
     this.gamesService.getGames().subscribe(games => {
-      this.gamesSignal.set(games)
+      this.gamesService.setGames(games)
       const updatedGame = games.find(g => g.game_id === gameId)
       if (updatedGame) {
         this.refreshWizardRoundState(updatedGame)
@@ -185,7 +197,7 @@ export class Games implements AfterViewInit {
   }
 
   refreshGames() {
-    this.gamesService.getGames().subscribe(games => this.gamesSignal.set(games))
+    this.gamesService.getGames().subscribe(games => this.gamesService.setGames(games))
   }
 
   toggleDateSort() {
@@ -533,7 +545,7 @@ export class Games implements AfterViewInit {
       if (this.editingRoundId() === entry.round_id) this.resetRoundForm()
       if (!gameId) return
       this.gamesService.getGames().subscribe(games => {
-        this.gamesSignal.set(games)
+        this.gamesService.setGames(games)
         const updatedGame = games.find(g => g.game_id === gameId)
         if (updatedGame) this.refreshWizardRoundState(updatedGame)
       })

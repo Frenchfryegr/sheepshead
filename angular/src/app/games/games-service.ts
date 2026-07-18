@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
@@ -12,6 +12,15 @@ import { Player } from '../interfaces/player';
 })
 export class GamesService {
   private http = inject(HttpClient)
+
+  // Held here (not in the Games component) so the last-known list survives the component
+  // being destroyed and recreated on route navigation (e.g. to /profile or /badges and back).
+  private gamesSignal = signal<Game[]>([])
+  games = this.gamesSignal.asReadonly()
+
+  setGames(games: Game[]): void {
+    this.gamesSignal.set(games)
+  }
 
   getGames(): Observable<Game[]> {
     return this.http.get<Game[]>(`${environment.apiUrl}/${environment.games}`)

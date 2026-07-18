@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
@@ -10,6 +10,15 @@ import { Badge } from '../interfaces/badge';
 })
 export class BadgesService {
   private http = inject(HttpClient)
+
+  // Held here (not in the Badges/Profile components) so the last-known list survives
+  // those components being destroyed and recreated on route navigation.
+  private badgesSignal = signal<Badge[]>([])
+  badges = this.badgesSignal.asReadonly()
+
+  setBadges(badges: Badge[]): void {
+    this.badgesSignal.set(badges)
+  }
 
   getBadges(): Observable<Badge[]> {
     return this.http.get<Badge[]>(`${environment.apiUrl}/${environment.badges}`)

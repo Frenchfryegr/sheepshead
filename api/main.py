@@ -62,6 +62,10 @@ def _count(value: float) -> str:
     return str(int(value))
 
 
+def _pts(value: float) -> str:
+    return f"{int(value)} pts"
+
+
 def _alpha_priority(name: str) -> tuple:
     # Inverts lexicographic order so that, under max(), the alphabetically-earliest name wins.
     return tuple(-ord(ch) for ch in (name or "").lower())
@@ -82,14 +86,14 @@ BADGE_DEFS: list[BadgeDef] = [
         title="The Sidekick",
         description="Highest partner win %",
         value=lambda stats: stats["partner_wins"] / stats["partner_rounds"],
-        eligible=lambda stats: stats["partner_rounds"] >= 5,
+        eligible=lambda stats: stats["partner_rounds"] >= 3,
         tiebreak_sample=lambda stats: stats["partner_rounds"],
         format=_pct,
     ),
     BadgeDef(
         key="dominator",
         title="Dominator",
-        description="Highest schneider-win rate as picker",
+        description="Highest no-schneider win rate as picker",
         value=lambda stats: stats["picker_schneider_wins"] / stats["picker_rounds"],
         eligible=lambda stats: stats["picker_rounds"] >= 5,
         tiebreak_sample=lambda stats: stats["picker_rounds"],
@@ -125,6 +129,30 @@ BADGE_DEFS: list[BadgeDef] = [
         eligible=lambda stats: stats["punching_bag_count"] >= 1,
         tiebreak_sample=lambda stats: stats["punching_bag_count"],
         format=_count,
+    ),
+    BadgeDef(
+        key="icarus",
+        title="Icarus",
+        description="Largest lead held in a game the player didn't win",
+        value=lambda stats: float(stats["icarus_max_lead"]),
+        eligible=lambda stats: stats["icarus_max_lead"] > 0,
+        tiebreak_sample=lambda stats: stats["icarus_max_lead"],
+        format=_pts,
+        tiebreakers=(
+            lambda stats: -stats["icarus_final_score"],
+        ),
+    ),
+    BadgeDef(
+        key="chicken_dinner",
+        title="Chicken Dinner",
+        description="Highest win % across all categories",
+        value=lambda stats: stats["games_won"] / stats["games_played"],
+        eligible=lambda stats: stats["games_played"] >= 3,
+        tiebreak_sample=lambda stats: stats["games_played"],
+        format=_pct,
+        tiebreakers=(
+            lambda stats: stats["best_won_score"] if stats["best_won_score"] is not None else float("-inf"),
+        ),
     ),
 ]
 
@@ -358,6 +386,10 @@ def _empty_stats(player_id: int) -> dict:
         "overconfident_count": 0,
         "overconfident_last_created": None,
         "punching_bag_count": 0,
+        "icarus_max_lead": 0,
+        "icarus_final_score": 0,
+        "games_won": 0,
+        "best_won_score": None,
     }
 
 
@@ -366,8 +398,8 @@ def aggregate_player_stats() -> dict[int, dict]:
         supabase.table(TABLE_NAMES.GAMES.value)
         .select(
             f"game_id, {TABLE_NAMES.PLAYERSXGAMES.value}(player_id), "
-            f"{TABLE_NAMES.ROUNDS.value}(round_result, no_schneider, no_partner, created, "
-            f"{TABLE_NAMES.PLAYERROUNDSCORE.value}(player_id, player_role))"
+            f"{TABLE_NAMES.ROUNDS.value}(round_number, round_result, no_schneider, no_partner, created, "
+            f"{TABLE_NAMES.PLAYERROUNDSCORE.value}(player_id, player_role, point_delta))"
         )
         .eq("is_completed", True)
         .execute()
@@ -417,6 +449,55 @@ def aggregate_player_stats() -> dict[int, dict]:
                 elif role == "Opponent":
                     if no_schneider and is_picker_win:
                         stats_for_player["punching_bag_count"] += 1
+
+        # Icarus: replay the game's rounds in order to find the largest lead any
+        # non-winning roster player held over the rest of the table at any point.
+        roster_ids = [player_game["player_id"] for player_game in game.get(TABLE_NAMES.PLAYERSXGAMES.value, [])]
+        if roster_ids:
+            sorted_rounds = sorted(
+                game.get(TABLE_NAMES.ROUNDS.value, []),
+                key=lambda round_row: round_row.get("round_number", 0),
+            )
+            running_totals = {player_id: 0 for player_id in roster_ids}
+            max_lead = {player_id: 0 for player_id in roster_ids}
+            for round_row in sorted_rounds:
+                for player_score in round_row.get(TABLE_NAMES.PLAYERROUNDSCORE.value, []):
+                    player_id = player_score["player_id"]
+                    if player_id in running_totals:
+                        running_totals[player_id] += player_score.get("point_delta", 0)
+                for player_id in roster_ids:
+                    others = [running_totals[other_id] for other_id in roster_ids if other_id != player_id]
+                    if not others:
+                        continue
+                    lead = running_totals[player_id] - max(others)
+                    if lead > max_lead[player_id]:
+                        max_lead[player_id] = lead
+
+            final_max = max(running_totals.values())
+            winner_ids = {player_id for player_id, total in running_totals.items() if total == final_max}
+
+            for player_id in roster_ids:
+                final_score = running_totals[player_id]
+
+                # Chicken Dinner: count this as a win and track the player's best-ever
+                # winning final score (used only as a tiebreak).
+                if player_id in winner_ids:
+                    stats_for_player = bucket(player_id)
+                    stats_for_player["games_won"] += 1
+                    best_won_score = stats_for_player["best_won_score"]
+                    if best_won_score is None or final_score > best_won_score:
+                        stats_for_player["best_won_score"] = final_score
+                    continue
+
+                # Icarus: largest lead a non-winning roster player held at any point.
+                lead = max_lead[player_id]
+                if lead <= 0:
+                    continue
+                stats_for_player = bucket(player_id)
+                current_best = stats_for_player["icarus_max_lead"]
+                if lead > current_best or (lead == current_best and final_score < stats_for_player["icarus_final_score"]):
+                    stats_for_player["icarus_max_lead"] = lead
+                    stats_for_player["icarus_final_score"] = final_score
 
     if stats:
         players_response = (

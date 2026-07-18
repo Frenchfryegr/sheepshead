@@ -12,8 +12,10 @@ import { Badge } from '../interfaces/badge';
 export class Badges implements OnInit {
   private badgesService = inject(BadgesService)
 
-  badges = signal<Badge[]>([])
-  isLoading = signal(true)
+  // Read directly from BadgesService's cache (not a local copy) so the last-known list
+  // survives this component being destroyed and recreated on route navigation.
+  badges = this.badgesService.badges
+  isLoading = signal(this.badges().length === 0)
   searchQuery = signal('')
 
   filteredBadges = computed(() => {
@@ -29,7 +31,7 @@ export class Badges implements OnInit {
   ngOnInit() {
     this.badgesService.getBadges().subscribe({
       next: badges => {
-        this.badges.set(badges)
+        this.badgesService.setBadges(badges)
         this.isLoading.set(false)
       },
       error: () => this.isLoading.set(false),

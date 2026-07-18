@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { computed, inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, finalize, Observable, switchMap, tap, throwError } from 'rxjs';
 
@@ -25,6 +25,24 @@ export class AuthService {
   claimedPlayerId = this.tokenStore.claimedPlayerId
   claimedPlayerName = this.tokenStore.claimedPlayerName
   isAuthenticated = this.tokenStore.isAuthenticated
+
+  // Reconstructed from TokenStore's cached fields (a root singleton) so pages that show
+  // profile data can render the last-known values immediately on (re)construction, instead
+  // of blanking out while a fresh request is in flight.
+  profile = computed<ProfileInfo | null>(() => {
+    const username = this.tokenStore.username()
+    if (!username) return null
+    return {
+      username,
+      contact_email: this.tokenStore.contactEmail(),
+      avatar_url: this.tokenStore.avatarUrl(),
+      scoreboard_initials: this.tokenStore.scoreboardInitials(),
+      scoreboard_color: this.tokenStore.scoreboardColor(),
+      show_avatar_on_scoreboard: this.tokenStore.showAvatarOnScoreboard(),
+      claimed_player_id: this.tokenStore.claimedPlayerId(),
+      claimed_player_name: this.tokenStore.claimedPlayerName(),
+    }
+  })
 
   constructor() {
     if (this.tokenStore.accessToken()) {
