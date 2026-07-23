@@ -38,6 +38,18 @@ export class TokenStore {
   constructor() {
     if (this.isBrowser) {
       this.loadFromStorage()
+      window.addEventListener('storage', this.onStorageEvent)
+    }
+  }
+
+  // Keeps tabs in sync: refresh-token rotation in one tab invalidates the token other open
+  // tabs are still holding, so without this they'd fail their next refresh and get logged out.
+  private onStorageEvent = (event: StorageEvent) => {
+    if (event.key !== STORAGE_KEY) return
+    if (event.newValue) {
+      this.loadFromStorage()
+    } else {
+      this.clear()
     }
   }
 

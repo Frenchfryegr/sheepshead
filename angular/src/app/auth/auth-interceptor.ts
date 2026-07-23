@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpBackend, HttpClient, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
-import { catchError, Observable, switchMap, tap, throwError } from 'rxjs';
+import { catchError, finalize, Observable, share, switchMap, tap, throwError } from 'rxjs';
 
 import { environment } from '../../environments/environment';
 import { RefreshedTokens } from '../interfaces/auth';
@@ -15,6 +15,9 @@ export class AuthInterceptor implements HttpInterceptor {
   // since this interceptor is itself part of that chain (see TokenStore's comment for why it
   // can't just call AuthService.refresh(), which uses the normal, intercepted HttpClient).
   private rawHttp = new HttpClient(inject(HttpBackend))
+  // Shared across concurrent 401s so simultaneous requests don't each spend the same (soon
+  // to be rotated) refresh token — a race that fails under refresh_token_reuse_interval.
+  private refreshInFlight: Observable<RefreshedTokens> | null = null
 
   intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     const token = this.tokenStore.accessToken()
@@ -41,15 +44,23 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   private refreshTokens(): Observable<RefreshedTokens> {
+    if (this.refreshInFlight) {
+      return this.refreshInFlight
+    }
+
     const refreshToken = this.tokenStore.refreshToken()
     if (!refreshToken) {
       this.tokenStore.clear()
       return throwError(() => new Error('No refresh token available'))
     }
-    return this.rawHttp.post<RefreshedTokens>(`${environment.apiUrl}/${environment.auth}/refresh`, {
+
+    this.refreshInFlight = this.rawHttp.post<RefreshedTokens>(`${environment.apiUrl}/${environment.auth}/refresh`, {
       refresh_token: refreshToken
     }).pipe(
-      tap(tokens => this.tokenStore.persistTokens(tokens.access_token, tokens.refresh_token, tokens.expires_at))
+      tap(tokens => this.tokenStore.persistTokens(tokens.access_token, tokens.refresh_token, tokens.expires_at)),
+      finalize(() => { this.refreshInFlight = null }),
+      share()
     )
+    return this.refreshInFlight
   }
 }
