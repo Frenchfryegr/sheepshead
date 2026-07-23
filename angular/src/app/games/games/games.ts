@@ -25,6 +25,7 @@ interface ScoreTableRow {
   pickerId: number | null
   partnerId: number | null
   dealerId: number | null
+  leasterWinnerId: number | null
 }
 
 interface ScoreTable {
@@ -834,7 +835,8 @@ export class Games implements AfterViewInit, OnDestroy {
       const pickerId = round.scores.find(s => s.player_role === 'Picker')?.player_id ?? null
       const partnerId = round.scores.find(s => s.player_role === 'Partner')?.player_id ?? null
       const dealerId = round.scores.find(s => s.player_role === 'Dealer')?.player_id ?? null
-      return { round_number: round.round_number, totals: new Map(runningTotals), pickerId, partnerId, dealerId }
+      const leasterWinnerId = round.scores.find(s => s.player_role === 'Leaster Winner')?.player_id ?? null
+      return { round_number: round.round_number, totals: new Map(runningTotals), pickerId, partnerId, dealerId, leasterWinnerId }
     })
 
     const lastRow = rows[rows.length - 1]

@@ -190,6 +190,7 @@
                             class="score-value__digits"
                             [class.score-value__digits--picker]="row.pickerId === player.player_id"
                             [class.score-value__digits--partner]="row.partnerId === player.player_id"
+                            [class.score-value__digits--leaster-winner]="row.leasterWinnerId === player.player_id"
                           >{{ absScore(row.totals.get(player.player_id)) }}</span>
                         </span>
                       </td>
@@ -561,6 +562,7 @@
                             class="score-value__digits"
                             [class.score-value__digits--picker]="row.pickerId === player.player_id"
                             [class.score-value__digits--partner]="row.partnerId === player.player_id"
+                            [class.score-value__digits--leaster-winner]="row.leasterWinnerId === player.player_id"
                           >{{ absScore(row.totals.get(player.player_id)) }}</span>
                         </span>
                       </td>
