@@ -1,0 +1,470 @@
+/* Table View — a phone lying flat on the table. Dark felt so it reads in a lit room without
+   glare, and large touch targets because the icons are the primary control surface. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tv {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 50% 45%, #1f5c43 0%, #123829 55%, #0b2019 100%);
+  color: #f3f4f6;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: contain;
+  touch-action: none;
+}
+
+.tv__exit {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f3f4f6;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ ring */
+
+.tv__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* Square so the ring stays circular in both orientations. */
+  width: min(100vw, 100dvh);
+  height: min(100vw, 100dvh);
+}
+
+.tv__seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  touch-action: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.tv__seat-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.tv__icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 1.25rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  overflow: visible;
+}
+
+.tv__avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.tv__initials {
+  letter-spacing: 0.02em;
+}
+
+.tv__role-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 22px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #1a1a2e;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.tv__seat-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.tv__total {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #e5f6ec;
+}
+
+.tv__total--negative {
+  color: #fca5a5;
+}
+
+.tv__delta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.tv__delta--negative {
+  color: #fca5a5;
+}
+
+.tv__name {
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(243, 244, 246, 0.72);
+  margin-bottom: 4px;
+}
+
+.tv__seat--selectable .tv__icon {
+  outline: 3px solid #fbbf24;
+  outline-offset: 3px;
+  animation: tv-pulse 1.6s ease-in-out infinite;
+}
+
+.tv__seat--dimmed {
+  opacity: 0.35;
+}
+
+.tv__seat--dragging {
+  opacity: 0.4;
+}
+
+.tv__seat--drop .tv__icon {
+  outline: 3px dashed #93c5fd;
+  outline-offset: 4px;
+}
+
+.tv--seat-edit .tv__seat-content {
+  animation: tv-wobble 0.35s ease-in-out infinite alternate;
+}
+
+.tv__drag-ghost {
+  position: absolute;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+
+@keyframes tv-pulse {
+  50% { outline-color: rgba(251, 191, 36, 0.35); }
+}
+
+@keyframes tv-wobble {
+  from { rotate: -2deg; }
+  to { rotate: 2deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv__seat--selectable .tv__icon,
+  .tv--seat-edit .tv__seat-content {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ hub */
+
+.tv__hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(40%, 190px);
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(8, 24, 18, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+/* The result step is genuinely a popup — it's allowed to float over the dimmed seats. */
+.tv__hub--wide {
+  width: min(56%, 250px);
+  max-width: min(56%, 250px);
+}
+
+.tv__hub-round {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(243, 244, 246, 0.8);
+}
+
+.tv__hub-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tv__hub-sub,
+.tv__hub-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(243, 244, 246, 0.55);
+}
+
+.tv__results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.tv__btn {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.tv__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tv__btn--primary {
+  background: #667eea;
+  color: #ffffff;
+}
+
+.tv__btn--ghost {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(243, 244, 246, 0.85);
+  padding: 8px 14px;
+  min-height: 38px;
+  font-size: 0.8rem;
+}
+
+.tv__btn--win {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.tv__btn--loss {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.tv__btn--leaster {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tv__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tv__chip {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(243, 244, 246, 0.85);
+  padding: 7px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tv__chip--on {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #1a1a2e;
+}
+
+/* ------------------------------------------------------------------ drawer */
+
+.tv__drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.tv__drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  max-height: 70%;
+  transform: translateY(calc(100% - 42px));
+  transition: transform 0.2s ease;
+  background: rgba(8, 24, 18, 0.97);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px 16px 0 0;
+}
+
+.tv__drawer--open {
+  transform: translateY(0);
+}
+
+.tv__drawer-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 0 10px;
+  border: none;
+  background: transparent;
+  color: rgba(243, 244, 246, 0.8);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tv__drawer-handle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tv__drawer-grip {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.tv__drawer-body {
+  overflow: auto;
+  padding: 0 12px max(14px, env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.tv__score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tv__score-table th,
+.tv__score-table td {
+  padding: 5px 6px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tv__score-table th {
+  position: sticky;
+  top: 0;
+  font-weight: 800;
+  border-radius: 4px;
+}
+
+/* Initials stacked over the avatar, matching the main Scoreboard's header cells. */
+.tv__score-head {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  line-height: 1;
+}
+
+/* Same 24px as .initials-avatar in the main Scoreboard. min/max and flex:0 0 auto are
+   belt-and-braces so the flex column can neither stretch nor shrink it. */
+.tv__score-avatar {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.tv__score-table td {
+  font-weight: 700;
+  color: #d1fae5;
+}
+
+.tv__cell--negative {
+  color: #fca5a5;
+}
+
+.tv__cell--dealer {
+  color: rgba(243, 244, 246, 0.4);
+}
+
+.tv__drawer-empty {
+  margin: 0;
+  padding: 10px 0 16px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(243, 244, 246, 0.55);
+}
+
+/* Small phones: shrink the ring furniture so 5 seats still fit. */
+@media (max-height: 700px), (max-width: 380px) {
+  .tv__icon {
+    width: 54px;
+    height: 54px;
+    font-size: 1.05rem;
+  }
+
+  .tv__name {
+    font-size: 0.62rem;
+    max-width: 76px;
+  }
+
+  .tv__hub {
+    gap: 8px;
+    padding: 10px;
+  }
+}

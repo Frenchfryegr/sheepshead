@@ -8,6 +8,14 @@ import { AuthService } from '../../auth/auth-service';
 import { Game } from '../../interfaces/game';
 import { Player } from '../../interfaces/player';
 import { PlayerRoundScore, PlayerRole, Round } from '../../interfaces/round';
+import { EMPTY_SCORE_TABLE, ScoreTable, ScoreTableRow } from '../../interfaces/score-table';
+import {
+  computePlayerInitials,
+  scoreboardColor,
+  scoreboardTextColor,
+  sortPlayersByInitials,
+} from '../player-display';
+import { TableDisplay } from '../table-display';
 
 interface RoundHistoryEntry {
   round_id: number
@@ -17,22 +25,6 @@ interface RoundHistoryEntry {
   no_partner: boolean
   no_trick: boolean
   scores: PlayerRoundScore[]
-}
-
-interface ScoreTableRow {
-  round_number: number
-  totals: Map<number, number>
-  pickerId: number | null
-  partnerId: number | null
-  dealerId: number | null
-  leasterWinnerId: number | null
-}
-
-interface ScoreTable {
-  players: Player[]
-  initials: Map<number, string>
-  rows: ScoreTableRow[]
-  winnerIds: Set<number>
 }
 
 type GameSortColumn = 'game_datetime' | 'num_players' | 'rounds' | 'status' | 'winner'
@@ -50,6 +42,7 @@ export class Games implements AfterViewInit, OnDestroy {
   protected authService = inject(AuthService)
   private route = inject(ActivatedRoute)
   private platformId = inject(PLATFORM_ID)
+  private tableDisplay = inject(TableDisplay)
   // Owned by GamesService (not local) so the last-known list survives this component being
   // destroyed and recreated on route navigation (e.g. to /profile or /badges and back).
   games = this.gamesService.games
@@ -93,6 +86,12 @@ export class Games implements AfterViewInit, OnDestroy {
       this.isLatestGameView.set(false)
     })
     this.gameWizardDialog.nativeElement.addEventListener('close', () => this.unlockBodyScroll())
+    // Esc while in Table View should leave Table View, not tear down the whole wizard.
+    this.gameWizardDialog.nativeElement.addEventListener('cancel', event => {
+      if (!this.tableViewMode()) return
+      event.preventDefault()
+      this.setTableViewMode(false)
+    })
   }
 
   private showDialogModal(dialog: HTMLDialogElement) {
@@ -143,6 +142,7 @@ export class Games implements AfterViewInit, OnDestroy {
   completedActionsMenuOpen = signal(false)
   addRoundFormOpen = signal(false)
   scoreboardDisplayMode = signal(false)
+  tableViewMode = signal(false)
 
   isLeasterRound = computed(() => this.roundResult() === 'Leaster')
   showPartnerSelect = computed(() => this.newGamePlayers().length === 5 && !this.isLeasterRound())
@@ -186,6 +186,8 @@ export class Games implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.realtimeSubscriptions.unsubscribe()
+    // A leaked wake lock would keep the user's screen on after they navigate away.
+    void this.tableDisplay.disable()
   }
 
   private refetchCurrentGame() {
@@ -597,6 +599,8 @@ export class Games implements AfterViewInit, OnDestroy {
 
   closeWizard() {
     this.refreshGames()
+    this.tableViewMode.set(false)
+    void this.tableDisplay.disable()
     this.gameWizardDialog.nativeElement.close()
     this.step.set('idle')
     this.roundActionsMenuOpen.set(false)
@@ -672,10 +676,31 @@ export class Games implements AfterViewInit, OnDestroy {
       const next = !enabled
       if (next) {
         this.resetRoundForm()
+        this.tableViewMode.set(false)
+        void this.tableDisplay.disable()
         this.roundActionsMenuOpen.set(false)
       }
       return next
     })
+  }
+
+  // Table View and Scoreboard display are mutually exclusive modes of the wizard.
+  // Must be called from a user gesture — requesting fullscreen from anywhere else is rejected.
+  toggleTableViewMode() {
+    this.setTableViewMode(!this.tableViewMode())
+  }
+
+  private setTableViewMode(enabled: boolean) {
+    this.tableViewMode.set(enabled)
+    if (enabled) {
+      this.resetRoundForm()
+      this.scoreboardDisplayMode.set(false)
+      this.roundActionsMenuOpen.set(false)
+      this.editingGameName.set(false)
+      void this.tableDisplay.enable(this.gameWizardDialog.nativeElement)
+    } else {
+      void this.tableDisplay.disable()
+    }
   }
 
   onGameRoundsBackdropClick(event: MouseEvent) {
@@ -789,7 +814,7 @@ export class Games implements AfterViewInit, OnDestroy {
   }
 
   selectedGameScoreTable(): ScoreTable {
-    if (!this.selectedGame) return { players: [], initials: new Map(), rows: [], winnerIds: new Set() }
+    if (!this.selectedGame) return EMPTY_SCORE_TABLE
     const roundsData = this.selectedGame.Rounds.map(r => this.toHistoryEntry(r))
     return this.buildScoreTable(this.getSelectedGamePlayers(), roundsData, this.selectedGame.is_completed)
   }
@@ -824,7 +849,7 @@ export class Games implements AfterViewInit, OnDestroy {
   }
 
   private buildScoreTable(players: Player[], roundsData: RoundHistoryEntry[], highlightWinner = false): ScoreTable {
-    const sortedPlayers = this.sortPlayersByInitials(players)
+    const sortedPlayers = sortPlayersByInitials(players)
     const sortedRounds = [...roundsData].sort((a, b) => a.round_number - b.round_number)
     const runningTotals = new Map<number, number>(sortedPlayers.map(p => [p.player_id, 0]))
 
@@ -848,7 +873,7 @@ export class Games implements AfterViewInit, OnDestroy {
       }
     }
 
-    return { players: sortedPlayers, initials: this.computePlayerInitials(sortedPlayers), rows, winnerIds }
+    return { players: sortedPlayers, initials: computePlayerInitials(sortedPlayers), rows, winnerIds }
   }
 
   activeInitialsTooltip = signal<number | null>(null)
@@ -863,59 +888,13 @@ export class Games implements AfterViewInit, OnDestroy {
     this.activeInitialsTooltip.set(null)
   }
 
-  private sortPlayersByInitials(players: Player[]): Player[] {
-    return [...players].sort((a, b) => {
-      const initialsCompare = this.getEffectiveInitials(a).localeCompare(this.getEffectiveInitials(b))
-      return initialsCompare !== 0 ? initialsCompare : a.player_name.localeCompare(b.player_name)
-    })
-  }
-
-  private computePlayerInitials(players: Player[]): Map<number, string> {
-    const baseInitials = players.map(p => this.getEffectiveInitials(p))
-    const totalCounts = new Map<string, number>()
-    for (const initials of baseInitials) {
-      totalCounts.set(initials, (totalCounts.get(initials) ?? 0) + 1)
-    }
-
-    const seenCounts = new Map<string, number>()
-    const result = new Map<number, string>()
-    players.forEach((player, i) => {
-      const initials = baseInitials[i]
-      if ((totalCounts.get(initials) ?? 0) > 1) {
-        const occurrence = (seenCounts.get(initials) ?? 0) + 1
-        seenCounts.set(initials, occurrence)
-        result.set(player.player_id, `${initials}${occurrence}`)
-      } else {
-        result.set(player.player_id, initials)
-      }
-    })
-    return result
-  }
-
-  private getEffectiveInitials(player: Player): string {
-    return player.scoreboard_initials ?? this.getBaseInitials(player.player_name)
-  }
-
+  // Thin template-facing wrappers over the shared helpers in `../player-display`, which the
+  // Table View ring also uses so the two surfaces can't drift on initials/colors.
   scoreboardColor(player: Player): string {
-    return player.scoreboard_color ?? '#1A1A2E'
+    return scoreboardColor(player)
   }
 
   scoreboardTextColor(player: Player): '#000000' | '#FFFFFF' {
-    const color = this.scoreboardColor(player)
-    const red = parseInt(color.slice(1, 3), 16) / 255
-    const green = parseInt(color.slice(3, 5), 16) / 255
-    const blue = parseInt(color.slice(5, 7), 16) / 255
-    const linear = [red, green, blue].map(channel => (
-      channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4)
-    ))
-    const luminance = (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2])
-    return luminance > 0.179 ? '#000000' : '#FFFFFF'
-  }
-
-  private getBaseInitials(name: string): string {
-    const tokens = name.trim().split(/\s+/).filter(Boolean)
-    if (tokens.length === 0) return '??'
-    if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase()
-    return (tokens[0][0] + tokens[tokens.length - 1][0]).toUpperCase()
+    return scoreboardTextColor(player)
   }
 }
