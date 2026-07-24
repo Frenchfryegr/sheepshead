@@ -9,6 +9,24 @@
   --tier-gold: #d4af37;
 }
 
+/* Angular component hosts are custom elements, which default to `display: inline`. An inline
+   box wrapping block-level content leaves a trailing empty inline fragment after the last
+   block, and WebKit generates a line box for it — about one line-height of dead space at the
+   bottom of the page. Blink does not. That is why the gap appeared only on iPhone (every iOS
+   browser is WebKit) and never on Android Chrome or in DevTools' device emulation.
+   Add any new component's selector here. */
+app-root,
+app-account-bar,
+app-games,
+app-table-view,
+app-profile,
+app-badges,
+app-achievements,
+app-statistics,
+router-outlet {
+  display: block;
+}
+
 html, body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
