@@ -343,11 +343,11 @@ export class Games implements AfterViewInit, OnDestroy {
     this.step.set('rounds')
     this.showDialogModal(this.gameWizardDialog.nativeElement)
     this.gameRealtime.connect(game.game_id)
-    // In-progress games open straight into Table View; its "Details" button switches back to
-    // the round-entry/scoreboard view. Safe to request fullscreen here — this only ever runs
-    // from the click on a game in the list. Completed games are unaffected: selectGame() sends
-    // those to the read-only score sheet dialog instead of here.
-    this.setTableViewMode(true)
+    // On small screens an in-progress game opens straight into Table View; its "Details"
+    // button switches back to the round-entry/scoreboard view. Safe to request fullscreen
+    // here — this only ever runs from the click on a game in the list. Completed games are
+    // unaffected: selectGame() sends those to the read-only score sheet dialog instead.
+    if (this.prefersTableViewDefault()) this.setTableViewMode(true)
   }
 
   private refreshWizardRoundState(game: Game) {
@@ -431,7 +431,7 @@ export class Games implements AfterViewInit, OnDestroy {
       // Same default as resuming an in-progress game. Note this runs in an HTTP callback, so
       // the user-gesture context is gone and the fullscreen request inside will be rejected —
       // wake lock and the mode itself still apply, and fullscreen is best-effort anyway.
-      this.setTableViewMode(true)
+      if (this.prefersTableViewDefault()) this.setTableViewMode(true)
     })
   }
 
@@ -691,6 +691,15 @@ export class Games implements AfterViewInit, OnDestroy {
       }
       return next
     })
+  }
+
+  // Small screens open straight into Table View — that's the phone-flat-on-the-table case it
+  // was built for. Laptops and tablets get the Details view, where the scoreboard and round
+  // list actually have room; the "Table" toggle is still there to opt in. 640px is the same
+  // breakpoint games.css uses everywhere else.
+  private prefersTableViewDefault(): boolean {
+    if (!isPlatformBrowser(this.platformId)) return false
+    return window.matchMedia('(max-width: 640px)').matches
   }
 
   // Table View and Scoreboard display are mutually exclusive modes of the wizard.
