@@ -1,0 +1,379 @@
+/* Table View — a phone lying flat on the table. Dark felt so it reads in a lit room without
+   glare, and large touch targets because the icons are the primary control surface. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tv {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* The radial gradient alone doesn't reach #0b2019 at the bottom edge, so it met the flat
+     canvas colour below the viewport as a visible seam. The linear layer settles the last
+     ~110px to exactly #0b2019, so the felt and the safe-area strip below it are the same
+     colour and the join is invisible. */
+  background:
+    linear-gradient(to bottom, rgba(11, 32, 25, 0) calc(100% - 110px), #0b2019 100%),
+    radial-gradient(circle at 50% 45%, #1f5c43 0%, #123829 55%, #0b2019 100%);
+  color: #f3f4f6;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: contain;
+  touch-action: none;
+}
+
+/* Same corner and ordering as the Details view's header controls, so the toggle and the close
+   button don't move when you switch between the two views. */
+.tv__topbar {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Translucent gray rather than the solid light pill of .table-view-toggle in games.css — on
+   the dark felt a solid chip reads as a foreign object, and this sits on the background
+   instead of on top of it. */
+.tv__details-btn {
+  /* Sizing/typography kept identical to .table-view-toggle; only the colours differ. */
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(243, 244, 246, 0.9);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+/* Matches .btn-close in games.css, lightened for the dark felt. */
+.tv__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: rgba(243, 244, 246, 0.75);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ ring */
+
+.tv__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* Square so the ring stays circular in both orientations. Sized off the container rather
+     than 100vw/100dvh: viewport units don't match the dialog's real box on iOS Safari. */
+  width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
+}
+
+.tv__seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  touch-action: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.tv__seat-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.tv__icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 1.25rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  overflow: visible;
+}
+
+.tv__avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.tv__initials {
+  letter-spacing: 0.02em;
+}
+
+.tv__role-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 22px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #1a1a2e;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.tv__seat-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.tv__total {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #e5f6ec;
+}
+
+.tv__total--negative {
+  color: #fca5a5;
+}
+
+.tv__delta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.tv__delta--negative {
+  color: #fca5a5;
+}
+
+.tv__name {
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(243, 244, 246, 0.72);
+  margin-bottom: 4px;
+}
+
+.tv__seat--selectable .tv__icon {
+  outline: 3px solid #fbbf24;
+  outline-offset: 3px;
+  animation: tv-pulse 1.6s ease-in-out infinite;
+}
+
+.tv__seat--dimmed {
+  opacity: 0.35;
+}
+
+.tv__seat--dragging {
+  opacity: 0.4;
+}
+
+.tv__seat--drop .tv__icon {
+  outline: 3px dashed #93c5fd;
+  outline-offset: 4px;
+}
+
+.tv--seat-edit .tv__seat-content {
+  animation: tv-wobble 0.35s ease-in-out infinite alternate;
+}
+
+.tv__drag-ghost {
+  position: absolute;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+
+@keyframes tv-pulse {
+  50% { outline-color: rgba(251, 191, 36, 0.35); }
+}
+
+@keyframes tv-wobble {
+  from { rotate: -2deg; }
+  to { rotate: 2deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv__seat--selectable .tv__icon,
+  .tv--seat-edit .tv__seat-content {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ hub */
+
+.tv__hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(40%, 190px);
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(8, 24, 18, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+/* The result step is genuinely a popup — it's allowed to float over the dimmed seats. */
+.tv__hub--wide {
+  width: min(56%, 250px);
+  max-width: min(56%, 250px);
+}
+
+.tv__hub-round {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(243, 244, 246, 0.8);
+}
+
+.tv__hub-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tv__hub-sub,
+.tv__hub-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(243, 244, 246, 0.55);
+}
+
+.tv__results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.tv__btn {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.tv__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tv__btn--primary {
+  background: #667eea;
+  color: #ffffff;
+}
+
+.tv__btn--ghost {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(243, 244, 246, 0.85);
+  padding: 8px 14px;
+  min-height: 38px;
+  font-size: 0.8rem;
+}
+
+.tv__btn--win {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.tv__btn--loss {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.tv__btn--leaster {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tv__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tv__chip {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(243, 244, 246, 0.85);
+  padding: 7px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tv__chip--on {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #1a1a2e;
+}
+
+@media (max-height: 700px), (max-width: 380px) {
+  .tv__icon {
+    width: 54px;
+    height: 54px;
+    font-size: 1.05rem;
+  }
+
+  .tv__name {
+    font-size: 0.62rem;
+    max-width: 76px;
+  }
+
+  .tv__hub {
+    gap: 8px;
+    padding: 10px;
+  }
+}

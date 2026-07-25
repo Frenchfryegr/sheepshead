@@ -254,6 +254,7 @@
   #GameWizardDialog
   class="dialog dialog-wizard"
   [class.dialog-wizard--scoreboard-display]="scoreboardDisplayMode()"
+  [class.dialog-wizard--table-view]="tableViewMode()"
   (click)="onWizardBackdropClick($event)"
 >
   @if (step() === 'players') {
@@ -369,6 +370,15 @@
       </div>
       @if (!editingRoundId() && !editingGameName()) {
         <button
+          class="table-view-toggle"
+          type="button"
+          [attr.aria-pressed]="tableViewMode()"
+          [class.table-view-toggle--on]="tableViewMode()"
+          (click)="toggleTableViewMode()"
+        >
+          <span>Table</span>
+        </button>
+        <button
           class="scoreboard-display-toggle"
           type="button"
           [attr.aria-pressed]="scoreboardDisplayMode()"
@@ -383,6 +393,37 @@
         <button class="btn-close" (click)="closeWizard()">&times;</button>
       }
     </div>
+
+    @if (tableViewMode()) {
+      <app-table-view
+        [gameId]="newGameId()"
+        [players]="newGamePlayers()"
+        [scoreTable]="activeScoreTable()"
+        [roundNumber]="activeRoundNumber()"
+        [isDealerGame]="isDealerGame()"
+        [canEdit]="authService.isAuthenticated()"
+        [submitting]="isSubmittingRound()"
+        [result]="roundResult()"
+        [pickerId]="roundPickerPlayerId()"
+        [partnerId]="roundPartnerPlayerId()"
+        [dealerId]="roundDealerPlayerId()"
+        [noPartner]="roundNoPartner()"
+        [noSchneider]="roundNoSchneider()"
+        [noTrick]="roundNoTrick()"
+        [previewScores]="roundPlayerScores()"
+        (resultChange)="roundResult.set($event)"
+        (pickerChange)="onPickerChange($event)"
+        (partnerChange)="onPartnerChange($event)"
+        (dealerChange)="onDealerChange($event)"
+        (noSchneiderChange)="toggleNoSchneider($event)"
+        (noTrickChange)="roundNoTrick.set($event)"
+        (roundSubmit)="submitRound()"
+        (roundCancel)="cancelAddRound()"
+        (exit)="toggleTableViewMode()"
+        (close)="closeWizard()"
+      />
+    }
+
     <div class="dialog-body">
       @if (!addRoundFormOpen() && !scoreboardDisplayMode()) {
         @if (authService.isAuthenticated()) {

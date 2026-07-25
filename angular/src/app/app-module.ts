@@ -7,6 +7,7 @@ import { provideServiceWorker } from '@angular/service-worker';
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
 import { Games } from './games/games/games';
+import { TableView } from './games/table-view/table-view';
 import { AuthInterceptor } from './auth/auth-interceptor';
 import { AccountBar } from './auth/account-bar/account-bar';
 import { Profile } from './profile/profile';
@@ -15,7 +16,7 @@ import { Achievements } from './achievements/achievements';
 import { Statistics } from './statistics/statistics';
 
 @NgModule({
-  declarations: [App, Games, AccountBar, Profile, Badges, Achievements, Statistics],
+  declarations: [App, Games, TableView, AccountBar, Profile, Badges, Achievements, Statistics],
   imports: [BrowserModule, AppRoutingModule, FormsModule, HttpClientModule],
   providers: [
     provideBrowserGlobalErrorListeners(),

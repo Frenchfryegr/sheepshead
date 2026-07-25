@@ -1,0 +1,137 @@
+<div class="tv" [class.tv--seat-edit]="seatEditMode()">
+  <!-- Same corner and order as the Details view's header controls: the Table/Details toggle,
+       then the close button. -->
+  <div class="tv__topbar">
+    <button class="tv__details-btn" type="button" (click)="exit.emit()">Details</button>
+    <button class="tv__close" type="button" (click)="close.emit()" aria-label="Close game">&times;</button>
+  </div>
+
+  <div
+    #ring
+    class="tv__ring"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp()"
+    (pointercancel)="onPointerCancel()"
+  >
+    @for (seat of seats(); track seat.player.player_id) {
+      <div
+        class="tv__seat"
+        [style.left.%]="seat.xPct"
+        [style.top.%]="seat.yPct"
+        [class.tv__seat--selectable]="isSelectable(seat)"
+        [class.tv__seat--dimmed]="isDimmed(seat)"
+        [class.tv__seat--dragging]="dragIndex() === seat.index"
+        [class.tv__seat--drop]="dropIndex() === seat.index && dragIndex() !== seat.index"
+        (pointerdown)="onSeatPointerDown(seat, $event)"
+      >
+        <div class="tv__seat-content">
+          <div class="tv__icon" [style.background-color]="seat.color" [style.color]="seat.textColor">
+            @if (seat.player.scoreboard_avatar_url) {
+              <img class="tv__avatar" [src]="seat.player.scoreboard_avatar_url" alt="" />
+            } @else {
+              <span class="tv__initials">{{ seat.initials }}</span>
+            }
+            @if (roleBadge(seat); as badge) {
+              <span class="tv__role-badge">{{ badge }}</span>
+            }
+          </div>
+          <div class="tv__seat-meta">
+            <span class="tv__total" [class.tv__total--negative]="seat.total < 0">{{ seat.total }}</span>
+            @if (previewDelta(seat) !== null) {
+              <span
+                class="tv__delta"
+                [class.tv__delta--negative]="previewDelta(seat)! < 0"
+              >{{ previewDelta(seat)! >= 0 ? '+' : '' }}{{ previewDelta(seat) }}</span>
+            }
+          </div>
+          <span class="tv__name">{{ seat.player.player_name }}</span>
+        </div>
+      </div>
+    }
+
+    @if (dragPos(); as pos) {
+      <div class="tv__drag-ghost" [style.left.px]="pos.x" [style.top.px]="pos.y" aria-hidden="true"></div>
+    }
+
+    <!-- Center hub: the result popup, the per-step prompt, and the submit button. -->
+    <div class="tv__hub" [class.tv__hub--wide]="step() === 'result' || step() === 'modifiers'">
+      @if (seatEditMode()) {
+        <p class="tv__hub-prompt">Drag a player onto another to swap seats</p>
+      } @else {
+        @switch (step()) {
+          @case ('idle') {
+            <span class="tv__hub-round">Round {{ roundNumber() }}</span>
+            @if (canEdit()) {
+              <button class="tv__btn tv__btn--primary" type="button" (click)="startRound()">Enter Round</button>
+              <p class="tv__hub-hint">Hold a player to rearrange seats</p>
+            } @else {
+              <p class="tv__hub-hint">Sign in to enter rounds</p>
+            }
+          }
+
+          @case ('dealer') {
+            <p class="tv__hub-prompt">Tap the dealer<span class="tv__hub-sub">sits out this round</span></p>
+            <button class="tv__btn tv__btn--ghost" type="button" (click)="stepBack()">Cancel</button>
+          }
+
+          @case ('result') {
+            <p class="tv__hub-prompt">Round result</p>
+            <div class="tv__results">
+              <button class="tv__btn tv__btn--win" type="button" (click)="chooseResult('Picker Win')">Picker Win</button>
+              <button class="tv__btn tv__btn--loss" type="button" (click)="chooseResult('Picker Loss')">Picker Loss</button>
+              <button class="tv__btn tv__btn--leaster" type="button" (click)="chooseResult('Leaster')">Leaster</button>
+            </div>
+            <button class="tv__btn tv__btn--ghost" type="button" (click)="stepBack()">Back</button>
+          }
+
+          @case ('picker') {
+            <p class="tv__hub-prompt">
+              @if (isLeaster()) { Tap the leaster winner } @else { Tap the picker }
+            </p>
+            <button class="tv__btn tv__btn--ghost" type="button" (click)="stepBack()">Back</button>
+          }
+
+          @case ('partner') {
+            <p class="tv__hub-prompt">Tap the partner</p>
+            <button class="tv__btn tv__btn--ghost" type="button" (click)="chooseNoPartner()">No Partner</button>
+            <button class="tv__btn tv__btn--ghost" type="button" (click)="stepBack()">Back</button>
+          }
+
+          @case ('modifiers') {
+            @if (noPartner() && !isLeaster()) {
+              <span class="tv__hub-sub">No partner</span>
+            }
+            <button
+              class="tv__btn tv__btn--primary"
+              type="button"
+              [disabled]="!canSubmit()"
+              (click)="submitRound()"
+            >
+              @if (submitting()) { Submitting… } @else { Submit Round {{ roundNumber() }} }
+            </button>
+            @if (!isLeaster()) {
+              <div class="tv__chips">
+                <button
+                  class="tv__chip"
+                  type="button"
+                  [class.tv__chip--on]="noSchneider()"
+                  (click)="noSchneiderChange.emit(!noSchneider())"
+                >No Schneider</button>
+                @if (noSchneider()) {
+                  <button
+                    class="tv__chip"
+                    type="button"
+                    [class.tv__chip--on]="noTrick()"
+                    (click)="noTrickChange.emit(!noTrick())"
+                  >No Trick</button>
+                }
+              </div>
+            }
+            <button class="tv__btn tv__btn--ghost" type="button" (click)="stepBack()">Back</button>
+          }
+        }
+      }
+    </div>
+  </div>
+
+</div>
