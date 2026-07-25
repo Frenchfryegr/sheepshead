@@ -328,6 +328,9 @@ export class TableView implements OnDestroy {
       this.dragIndex.set(null)
       this.dropIndex.set(null)
       this.dragPos.set(null)
+      // Dropping ends the rearrange gesture — long-press, drag, release, done. No separate
+      // confirmation step, so the hint clears as soon as the player lands.
+      this.seatEditMode.set(false)
     } else if (this.pressSeat && !this.movedDuringPress && !this.longPressFired) {
       this.handleSeatTap(this.pressSeat)
     }
@@ -341,13 +344,9 @@ export class TableView implements OnDestroy {
     this.dragIndex.set(null)
     this.dropIndex.set(null)
     this.dragPos.set(null)
+    this.seatEditMode.set(false)
     this.pressSeat = null
     this.pressOrigin = null
-  }
-
-  endSeatEdit() {
-    this.seatEditMode.set(false)
-    this.onPointerCancel()
   }
 
   // Swap rather than insert-and-shift: on a small ring it's easier to predict and it undoes
