@@ -577,7 +577,9 @@
 
 @media (max-width: 640px) {
   .profile-page {
-    padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
+    /* Top inset omitted deliberately — .account-bar above already consumes it. See the note
+       on .games-container in games.css. */
+    padding: 12px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px));
   }
 
   .profile-panel {
