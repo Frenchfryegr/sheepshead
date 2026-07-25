@@ -27,6 +27,21 @@ router-outlet {
   display: block;
 }
 
+/* iOS standalone PWAs (apple-mobile-web-app-status-bar-style: black-translucent +
+   viewport-fit=cover) paint the strip around the layout viewport — the home-indicator area —
+   with the canvas background, which propagates up from <html>. With none set it renders
+   white: invisible against the light games list, but a white band under the dark Table View
+   and below the game-entry dialog's backdrop. Setting it explicitly makes that strip ours. */
+html {
+  background-color: #ffffff;
+}
+
+/* Table View is edge-to-edge dark felt; TableDisplay toggles this while it is active so the
+   home-indicator strip matches instead of flashing white. */
+html.app-dark-canvas {
+  background-color: #0b2019;
+}
+
 html, body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;

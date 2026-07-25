@@ -1,6 +1,9 @@
 import { inject, Injectable, PLATFORM_ID } from '@angular/core'
 import { isPlatformBrowser } from '@angular/common'
 
+// Paired with the `html.app-dark-canvas` rule in styles.css.
+const DARK_CANVAS_CLASS = 'app-dark-canvas'
+
 // Keeps the screen awake and (best-effort) fullscreen while Table View is on — the phone is
 // lying flat on the table between rounds, so the default dim/lock behaviour is wrong.
 //
@@ -25,6 +28,8 @@ export class TableDisplay {
     async enable(element: HTMLElement): Promise<void> {
         if (!this.isBrowser || this.active) return
         this.active = true
+        // Match the canvas to the felt, so the iOS home-indicator strip isn't a white band.
+        document.documentElement.classList.add(DARK_CANVAS_CLASS)
         document.addEventListener('visibilitychange', this.onVisibilityChange)
         await this.acquireWakeLock()
         try {
@@ -37,6 +42,7 @@ export class TableDisplay {
     async disable(): Promise<void> {
         if (!this.isBrowser || !this.active) return
         this.active = false
+        document.documentElement.classList.remove(DARK_CANVAS_CLASS)
         document.removeEventListener('visibilitychange', this.onVisibilityChange)
         await this.releaseWakeLock()
         try {
