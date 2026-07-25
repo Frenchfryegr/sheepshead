@@ -66,13 +66,13 @@ export class TableView implements OnDestroy {
   // could fire the output binding.
   roundSubmit = output<void>()
   roundCancel = output<void>()
-  exit = output<void>()
+  exit = output<void>()   // switch to the Details view
+  close = output<void>()  // close the game entirely
 
   @ViewChild('ring') ringElement?: ElementRef<HTMLElement>
 
   step = signal<TableStep>('idle')
   seatEditMode = signal(false)
-  drawerOpen = signal(false)
   seatOrder = signal<number[]>([])
   dragIndex = signal<number | null>(null)
   dropIndex = signal<number | null>(null)
@@ -277,7 +277,6 @@ export class TableView implements OnDestroy {
   // ---------------------------------------------------------------- drag to rearrange
 
   onSeatPointerDown(seat: Seat, event: PointerEvent) {
-    if (this.drawerOpen()) return
     this.lastPointer = { x: event.clientX, y: event.clientY }
     this.pressSeat = seat
     this.pressOrigin = { x: event.clientX, y: event.clientY }
@@ -395,20 +394,4 @@ export class TableView implements OnDestroy {
     }
   }
 
-  // ---------------------------------------------------------------- drawer
-
-  playerColor(player: Player): string {
-    return scoreboardColor(player)
-  }
-
-  playerTextColor(player: Player): string {
-    return scoreboardTextColor(player)
-  }
-
-  toggleDrawer() {
-    // Never let the scoreboard cover a round in progress.
-    if (this.step() !== 'idle') return
-    this.endSeatEdit()
-    this.drawerOpen.update(open => !open)
-  }
 }

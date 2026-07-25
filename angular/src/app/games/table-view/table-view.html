@@ -1,5 +1,10 @@
 <div class="tv" [class.tv--seat-edit]="seatEditMode()">
-  <button class="tv__exit" type="button" (click)="exit.emit()" aria-label="Exit table view">&times;</button>
+  <!-- Same corner and order as the Details view's header controls: the Table/Details toggle,
+       then the close button. -->
+  <div class="tv__topbar">
+    <button class="tv__details-btn" type="button" (click)="exit.emit()">Details</button>
+    <button class="tv__close" type="button" (click)="close.emit()" aria-label="Close game">&times;</button>
+  </div>
 
   <div
     #ring
@@ -130,65 +135,4 @@
     </div>
   </div>
 
-  <!-- Scoreboard: a floating pill rather than a strip mounted on the bottom edge. Nothing sits
-       flush against the bottom, so the safe-area gap below the viewport reads as deliberate
-       margin instead of a seam under a cut-off control. -->
-  @if (!drawerOpen() && step() === 'idle') {
-    <button
-      class="tv__scoreboard-btn"
-      type="button"
-      [attr.aria-expanded]="false"
-      (click)="toggleDrawer()"
-    >Scoreboard</button>
-  }
-  @if (drawerOpen()) {
-    <div class="tv__drawer-backdrop" (click)="toggleDrawer()"></div>
-  }
-  <div class="tv__drawer" [class.tv__drawer--open]="drawerOpen()">
-    <button
-      class="tv__drawer-handle"
-      type="button"
-      [attr.aria-expanded]="drawerOpen()"
-      (click)="toggleDrawer()"
-    >
-      <span class="tv__drawer-grip" aria-hidden="true"></span>
-      <span>Hide Scoreboard</span>
-    </button>
-    <div class="tv__drawer-body">
-      @if (scoreTable().rows.length > 0) {
-        <table class="tv__score-table">
-          <thead>
-            <tr>
-              <th>Rd</th>
-              @for (player of scoreTable().players; track player.player_id) {
-                <th [style.background-color]="playerColor(player)" [style.color]="playerTextColor(player)">
-                  <span class="tv__score-head">
-                    <span>{{ scoreTable().initials.get(player.player_id) }}</span>
-                    @if (player.scoreboard_avatar_url) {
-                      <img class="tv__score-avatar" [src]="player.scoreboard_avatar_url" alt="" />
-                    }
-                  </span>
-                </th>
-              }
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of scoreTable().rows; track row.round_number) {
-              <tr>
-                <td>{{ row.round_number }}</td>
-                @for (player of scoreTable().players; track player.player_id) {
-                  <td
-                    [class.tv__cell--negative]="(row.totals.get(player.player_id) ?? 0) < 0"
-                    [class.tv__cell--dealer]="row.dealerId === player.player_id"
-                  >{{ row.totals.get(player.player_id) ?? 0 }}</td>
-                }
-              </tr>
-            }
-          </tbody>
-        </table>
-      } @else {
-        <p class="tv__drawer-empty">No rounds played yet.</p>
-      }
-    </div>
-  </div>
 </div>

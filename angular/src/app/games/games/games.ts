@@ -343,6 +343,11 @@ export class Games implements AfterViewInit, OnDestroy {
     this.step.set('rounds')
     this.showDialogModal(this.gameWizardDialog.nativeElement)
     this.gameRealtime.connect(game.game_id)
+    // In-progress games open straight into Table View; its "Details" button switches back to
+    // the round-entry/scoreboard view. Safe to request fullscreen here — this only ever runs
+    // from the click on a game in the list. Completed games are unaffected: selectGame() sends
+    // those to the read-only score sheet dialog instead of here.
+    this.setTableViewMode(true)
   }
 
   private refreshWizardRoundState(game: Game) {
@@ -423,6 +428,10 @@ export class Games implements AfterViewInit, OnDestroy {
       this.newGameName.set(game.game_name)
       this.step.set('rounds')
       this.resetRoundForm()
+      // Same default as resuming an in-progress game. Note this runs in an HTTP callback, so
+      // the user-gesture context is gone and the fullscreen request inside will be rejected —
+      // wake lock and the mode itself still apply, and fullscreen is best-effort anyway.
+      this.setTableViewMode(true)
     })
   }
 

@@ -26,18 +26,51 @@
   touch-action: none;
 }
 
-.tv__exit {
+/* Same corner and ordering as the Details view's header controls, so the toggle and the close
+   button don't move when you switch between the two views. */
+.tv__topbar {
   position: absolute;
   top: max(10px, env(safe-area-inset-top));
   right: max(10px, env(safe-area-inset-right));
   z-index: 5;
-  width: 40px;
-  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Translucent gray rather than the solid light pill of .table-view-toggle in games.css — on
+   the dark felt a solid chip reads as a foreign object, and this sits on the background
+   instead of on top of it. */
+.tv__details-btn {
+  /* Sizing/typography kept identical to .table-view-toggle; only the colours differ. */
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(243, 244, 246, 0.9);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+/* Matches .btn-close in games.css, lightened for the dark felt. */
+.tv__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px;
   border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: #f3f4f6;
-  font-size: 1.4rem;
+  border-radius: 6px;
+  background: none;
+  color: rgba(243, 244, 246, 0.75);
+  font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -327,156 +360,6 @@
   color: #1a1a2e;
 }
 
-/* ------------------------------------------------------------------ drawer */
-
-/* Floats clear of the bottom edge — see the note on .tv__drawer. */
-.tv__scoreboard-btn {
-  position: absolute;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
-  transform: translateX(-50%);
-  z-index: 5;
-  min-height: 40px;
-  padding: 10px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(243, 244, 246, 0.9);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-}
-
-.tv__drawer-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  background: rgba(0, 0, 0, 0.45);
-}
-
-.tv__drawer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 7;
-  display: flex;
-  flex-direction: column;
-  max-height: 70%;
-  /* Slides fully out of view when closed — no permanent strip pinned to the bottom edge, and
-     the solid #0b2019 matches the canvas colour below the viewport so the drawer's bottom
-     edge doesn't create a seam either. */
-  transform: translateY(100%);
-  transition: transform 0.2s ease;
-  background: #0b2019;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px 16px 0 0;
-}
-
-.tv__drawer--open {
-  transform: translateY(0);
-}
-
-.tv__drawer-handle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 8px 0 10px;
-  border: none;
-  background: transparent;
-  color: rgba(243, 244, 246, 0.8);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.tv__drawer-grip {
-  width: 38px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.tv__drawer-body {
-  overflow: auto;
-  padding: 0 12px max(14px, env(safe-area-inset-bottom));
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-}
-
-.tv__score-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.tv__score-table th,
-.tv__score-table td {
-  padding: 5px 6px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.tv__score-table th {
-  position: sticky;
-  top: 0;
-  font-weight: 800;
-  border-radius: 4px;
-}
-
-/* Initials stacked over the avatar, matching the main Scoreboard's header cells. */
-.tv__score-head {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  line-height: 1;
-}
-
-/* Same 24px as .initials-avatar in the main Scoreboard. min/max and flex:0 0 auto are
-   belt-and-braces so the flex column can neither stretch nor shrink it. */
-.tv__score-avatar {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  max-width: 24px;
-  max-height: 24px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  object-fit: cover;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
-}
-
-.tv__score-table td {
-  font-weight: 700;
-  color: #d1fae5;
-}
-
-.tv__cell--negative {
-  color: #fca5a5;
-}
-
-.tv__cell--dealer {
-  color: rgba(243, 244, 246, 0.4);
-}
-
-.tv__drawer-empty {
-  margin: 0;
-  padding: 10px 0 16px;
-  text-align: center;
-  font-size: 0.8rem;
-  color: rgba(243, 244, 246, 0.55);
-}
-
-/* Small phones: shrink the ring furniture so 5 seats still fit. */
 @media (max-height: 700px), (max-width: 380px) {
   .tv__icon {
     width: 54px;
