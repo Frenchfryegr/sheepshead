@@ -130,7 +130,17 @@
     </div>
   </div>
 
-  <!-- Scoreboard drawer: hidden by default, only reachable while idle. -->
+  <!-- Scoreboard: a floating pill rather than a strip mounted on the bottom edge. Nothing sits
+       flush against the bottom, so the safe-area gap below the viewport reads as deliberate
+       margin instead of a seam under a cut-off control. -->
+  @if (!drawerOpen() && step() === 'idle') {
+    <button
+      class="tv__scoreboard-btn"
+      type="button"
+      [attr.aria-expanded]="false"
+      (click)="toggleDrawer()"
+    >Scoreboard</button>
+  }
   @if (drawerOpen()) {
     <div class="tv__drawer-backdrop" (click)="toggleDrawer()"></div>
   }
@@ -138,12 +148,11 @@
     <button
       class="tv__drawer-handle"
       type="button"
-      [disabled]="step() !== 'idle'"
       [attr.aria-expanded]="drawerOpen()"
       (click)="toggleDrawer()"
     >
       <span class="tv__drawer-grip" aria-hidden="true"></span>
-      <span>Scoreboard</span>
+      <span>Hide Scoreboard</span>
     </button>
     <div class="tv__drawer-body">
       @if (scoreTable().rows.length > 0) {

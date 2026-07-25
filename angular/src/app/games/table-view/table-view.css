@@ -11,7 +11,12 @@
   position: relative;
   width: 100%;
   height: 100%;
+  /* The radial gradient alone doesn't reach #0b2019 at the bottom edge, so it met the flat
+     canvas colour below the viewport as a visible seam. The linear layer settles the last
+     ~110px to exactly #0b2019, so the felt and the safe-area strip below it are the same
+     colour and the join is invisible. */
   background:
+    linear-gradient(to bottom, rgba(11, 32, 25, 0) calc(100% - 110px), #0b2019 100%),
     radial-gradient(circle at 50% 45%, #1f5c43 0%, #123829 55%, #0b2019 100%);
   color: #f3f4f6;
   overflow: hidden;
@@ -324,6 +329,27 @@
 
 /* ------------------------------------------------------------------ drawer */
 
+/* Floats clear of the bottom edge — see the note on .tv__drawer. */
+.tv__scoreboard-btn {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  transform: translateX(-50%);
+  z-index: 5;
+  min-height: 40px;
+  padding: 10px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(243, 244, 246, 0.9);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
 .tv__drawer-backdrop {
   position: absolute;
   inset: 0;
@@ -340,9 +366,12 @@
   display: flex;
   flex-direction: column;
   max-height: 70%;
-  transform: translateY(calc(100% - 42px));
+  /* Slides fully out of view when closed — no permanent strip pinned to the bottom edge, and
+     the solid #0b2019 matches the canvas colour below the viewport so the drawer's bottom
+     edge doesn't create a seam either. */
+  transform: translateY(100%);
   transition: transform 0.2s ease;
-  background: rgba(8, 24, 18, 0.97);
+  background: #0b2019;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px 16px 0 0;
 }
@@ -366,11 +395,6 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-}
-
-.tv__drawer-handle:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .tv__drawer-grip {
