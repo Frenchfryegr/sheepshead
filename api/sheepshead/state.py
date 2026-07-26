@@ -159,3 +159,6 @@ class Event:
     points: int | None = None
     hand_number: int | None = None
     result: HandResult | None = None
+    # Seat taking the trick after this card. Sent with card_played so the client can follow the
+    # lead as it changes, without re-deriving trick order — which is engine business.
+    winning_seat: int | None = None

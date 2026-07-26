@@ -53,6 +53,8 @@ export interface OnlineEvent {
   card?: OnlineCard | null
   /** Set when the played card was the picker's face-down under. */
   under?: boolean
+  /** Seat taking the trick after this card, on card_played events. */
+  winning_seat?: number | null
   points?: number
   hand_number?: number
   result?: OnlineHandResult
@@ -90,6 +92,8 @@ export interface OnlineGameView {
   partner_seat: number | null
   is_leaster: boolean
   current_trick: OnlineTrickCard[]
+  /** Seat currently taking the open trick; null when none has been played or only the under has. */
+  trick_winning_seat: number | null
   completed_tricks: OnlineCompletedTrick[]
   /** The picker's own under card; null for every other seat. */
   under_card: OnlineCard | null

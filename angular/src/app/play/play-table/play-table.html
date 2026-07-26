@@ -2,7 +2,7 @@
   <header class="online-table__status">
     <div>
       <span>Hand {{ game().hand_number }}</span>
-      <strong>{{ game().is_leaster ? 'Leaster' : game().called_card ? 'Called ' + game().called_card : 'Sheepshead' }}</strong>
+      <strong>{{ contractLabel() }}</strong>
     </div>
     <button class="table-link" type="button" (click)="openHistory()">History ({{ game().hand_history.length }})</button>
   </header>
@@ -56,7 +56,9 @@
             aria-label="Face-down card"
           >
             <span class="play-card__facedown-mark">?</span>
-            <span class="play-card__order">{{ $index + 1 }}</span>
+            @if (game().trick_winning_seat === play.seat) {
+              <span class="play-card__leading" aria-label="Currently taking the trick"></span>
+            }
           </div>
         } @else {
           <div
@@ -67,7 +69,9 @@
             [class.play-card--under]="play.under"
             [attr.aria-label]="cardLabel(play.card)"
           >
-            <span class="play-card__order">{{ $index + 1 }}</span>
+            @if (game().trick_winning_seat === play.seat) {
+              <span class="play-card__leading" aria-label="Currently taking the trick"></span>
+            }
           </div>
         }
       }

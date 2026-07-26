@@ -111,10 +111,11 @@ CHEAP_TRUMP_COST = BALANCED.cheap_trump_cost
 FAIL_COST = (0.2, 0.3, 0.4, 0.7, 1.3, 1.6)
 
 # Point lines that change the payout. The picker's team needs 61; the opponents need 60. A
-# losing team held under 31 pays double, and a winning team reaching 91 collects double.
+# losing team held under 30 pays double, and a winning team reaching 91 collects double.
+# Reaching 30 exactly is safe, which is why the line is 30 and not 31 — see scoring.py.
 PICKER_TARGET = 61
 OPPONENT_TARGET = 60
-SCHNEIDER_LINE = 31
+SCHNEIDER_LINE = 30
 NO_SCHNEIDER_LINE = 91
 
 # --- leaster play ------------------------------------------------------------------------

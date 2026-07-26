@@ -341,21 +341,18 @@
   box-shadow: 0 0 24px rgb(242 211 111 / 85%);
 }
 
-.play-card__order {
+/* Marks the card currently taking the trick. This was the play order (1-5); the running leader
+   is the more useful thing to know, and the engine recomputes it after every card. */
+.play-card__leading {
   position: absolute;
   top: -9px;
   right: -9px;
-  display: grid;
   width: 24px;
   height: 24px;
-  place-items: center;
   border: 2px solid #ffffff;
   border-radius: 50%;
-  color: #183c2e;
   background: #f2d36f;
   box-shadow: 0 2px 7px rgb(0 0 0 / 28%);
-  font-size: .72rem;
-  font-weight: 900;
 }
 
 @keyframes card-arrive {

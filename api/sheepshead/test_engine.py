@@ -176,6 +176,26 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(4, leaster.deltas[leaster.leaster_winner])
         self.assertEqual(0, sum(leaster.deltas))
 
+    def test_thirty_points_is_schneider_and_pays_single(self) -> None:
+        """Reaching 30 is safe. The doubling line is 30, not 31 — an off-by-one either way
+        silently changes what every close hand pays, so both sides of it are pinned."""
+        rules = RuleSet()
+        # 31 and 89 are skipped: the fixture builds totals greedily and cannot hit them.
+        for losing, expected in ((28, 2), (29, 2), (30, 1), (32, 1)):
+            with self.subTest(picker_loses_with=losing):
+                # The picker falls short, so their own total is the losing side's.
+                result = score_hand(_scoring_hand(team_points=losing), rules)
+                self.assertEqual("picker_loss", result.kind)
+                self.assertEqual(expected, result.multiplier)
+                self.assertEqual(expected >= 2, result.no_schneider)
+
+        for team, expected in ((88, 1), (90, 1), (91, 2), (92, 2)):
+            with self.subTest(picker_wins_with=team):
+                # Mirrored: 91 is the least that holds the opposition to 29.
+                result = score_hand(_scoring_hand(team_points=team), rules)
+                self.assertEqual("picker_win", result.kind)
+                self.assertEqual(expected, result.multiplier)
+
     def test_called_ace_constraints_are_legal_action_rules(self) -> None:
         rules = RuleSet()
         state = create_game(rules, _seats(), 999)
@@ -354,6 +374,27 @@ class EngineTests(unittest.TestCase):
         self.assertEqual([], decoded.hand.completed_tricks)
         # The rest of the hand still decodes, including the winner list it cannot rebuild.
         self.assertEqual(state.hand.trick_winners, decoded.hand.trick_winners)
+
+    def test_the_running_trick_leader_is_reported_and_moves(self) -> None:
+        state = self._leaster_in_play(2468)
+        self.assertIsNone(seat_view(state, 0)["trick_winning_seat"], "no trick open yet")
+
+        leaders = []
+        for _ in range(5):
+            turn = state.hand.turn_seat
+            play = next(a for a in legal_actions(state, turn) if a.type == "play")
+            state, events = apply_action(state, turn, play)
+            played = next(event for event in events if event.type == "card_played")
+            leaders.append(played.winning_seat)
+
+        # Every card reports who is taking the trick at that moment, and the first card always
+        # leads its own trick.
+        self.assertEqual(leaders[0], state.hand.completed_tricks[0][0][0])
+        self.assertTrue(all(seat is not None for seat in leaders))
+        # The last report must agree with who actually took it.
+        self.assertEqual(state.hand.trick_winners[0], leaders[-1])
+        # Swept, so nobody is taking anything until the next card falls.
+        self.assertIsNone(seat_view(state, 0)["trick_winning_seat"])
 
     def test_seat_view_exposes_public_trick_history_and_points(self) -> None:
         state = self._leaster_in_play(8642)
