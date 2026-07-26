@@ -119,6 +119,19 @@ app-play .btn-secondary:hover:not(:disabled) {
   background: #e6eee9;
 }
 
+/* Only used to commit an irreversible delete, so it should not look like anything else here. */
+app-play .btn-danger {
+  border-color: #c0463f;
+  color: #fff6f5;
+  background: linear-gradient(145deg, #d6564d, #b83e37);
+  box-shadow: 0 3px 10px rgb(140 40 34 / 28%);
+}
+
+app-play .btn-danger:hover:not(:disabled) {
+  border-color: #a9352f;
+  background: linear-gradient(145deg, #e0635a, #c4463f);
+}
+
 app-play .input {
   min-height: 44px;
   padding: 0.6rem 2.4rem 0.6rem 0.8rem;

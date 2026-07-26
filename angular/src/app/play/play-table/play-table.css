@@ -4,7 +4,17 @@
   height: 100%;
 }
 
+/* The whole table geometry derives from four numbers. Card size and the ellipse the trick sits
+   on must move together — change one alone and the cards either overlap or drift apart — so they
+   are declared as a set here and everything else is calc()'d from them. To resize the cards,
+   scale all four by the same factor and nothing else needs touching. */
 .online-table {
+  --card-w: 116px;
+  --card-h: 162px;
+  --rx: 152px;   /* trick ellipse, horizontal */
+  --ry: 100px;   /* trick ellipse, vertical */
+  --fan-overlap: 30px;
+
   position: relative;
   width: 100%;
   height: 100%;
@@ -79,8 +89,9 @@
    than pixels so the ring keeps its shape as the viewport changes. */
 .online-seat {
   position: absolute;
-  width: 132px;
-  padding: .5rem .45rem;
+  width: 158px;
+  padding: .6rem .55rem;
+  font-size: 1.02rem;
   border: 1px solid rgb(255 255 255 / 18%);
   border-radius: .75rem;
   color: #fff;
@@ -103,11 +114,13 @@
 }
 
 .online-seat__name {
+  font-size: 1.06rem;
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .online-seat__style {
-  font-size: .62rem;
+  font-size: .74rem;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -115,9 +128,9 @@
 }
 
 .online-seat__meta {
-  margin-top: .3rem;
-  font-size: .72rem;
-  opacity: .82;
+  margin-top: .35rem;
+  font-size: .88rem;
+  opacity: .85;
 }
 
 /* Dealer button, sitting on the corner of the seat like the real thing. Both .online-seat
@@ -148,7 +161,7 @@
   border-radius: 99px;
   color: #2d2410;
   background: #ebca68;
-  font-size: .64rem;
+  font-size: .74rem;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -175,8 +188,8 @@
   position: absolute;
   top: 47%;
   left: 50%;
-  width: 420px;
-  height: 362px;
+  width: calc(2 * var(--rx) + var(--card-w));
+  height: calc(2 * var(--ry) + var(--card-h));
   transform: translate(-50%, -50%);
 }
 
@@ -217,8 +230,8 @@
 .table-status {
   position: absolute;
   z-index: 14;
-  /* Between the top seats and the trick, now that the ring occupies both. */
-  top: max(196px, calc(env(safe-area-inset-top) + 186px));
+  /* Between the top seats and the trick: the trick's own top edge, less a gap. */
+  top: max(150px, calc(47% - var(--ry) - var(--card-h) / 2 - 44px));
   left: 50%;
   max-width: min(80%, 340px);
   margin: 0;
@@ -233,39 +246,54 @@
 }
 
 .play-card {
-  width: 116px;
-  height: 162px;
+  width: var(--card-w);
+  height: var(--card-h);
   border: 1px solid #d7d1c5;
-  border-radius: 9px;
+  border-radius: calc(var(--card-w) * .078);
   color: #1d2521;
   background: #fffdf8;
   box-shadow: 0 4px 10px rgb(0 0 0 / 22%);
 }
 
-.play-card--red {
-  color: #b3262e;
+/* The sheet is pip art on transparency — it contains no card body, so .play-card's own cream
+   rectangle *is* the card and this only paints the markings onto it. Percentage sizing means the
+   sheet's resolution is irrelevant; a larger sheet drops in with no other change. */
+.play-card--art {
+  background-image: url('/cards/faces.png');
+  background-repeat: no-repeat;
+  background-size: 1300% 400%;   /* 13 columns x 4 rows */
+}
+
+/* Nearest-neighbour only where the sheet is being *enlarged*.
+   The 142px cell has to fill a 116px card, so at 1dppx it is scaled DOWN — and pixelated is
+   nearest-neighbour in both directions, dropping source pixels instead of averaging them, which
+   breaks the thin lines in this art. Measured on a 1440p monitor at 100%: visibly worse than
+   smooth. Above 1.5dppx the cell is enlarged instead (1.63x at 2x, 1.77x on a 3x phone), and
+   nearest-neighbour is what keeps hard-edged art crisp rather than blurred.
+   crisp-edges first for browsers that only understand that spelling. */
+@media (min-resolution: 1.5dppx) {
+  .play-card--art {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+  }
 }
 
 .play-card--table {
   --card-from-x: 0;
   --card-from-y: 0;
   position: absolute;
-  display: grid;
-  place-content: center;
-  font-size: 2.1rem;
-  font-weight: 800;
   transition: transform .3s, opacity .3s;
 }
 
-/* One card per seat on an ellipse (rx 152, ry 100) inside the 420x362 box, matching the ring
-   the seats sit on. Derived rather than eyeballed: every card stays inside the box, no card's
-   centre — where the rank and suit are drawn — is ever covered, and the worst overlap is 16%,
-   at the outer corners of 1-on-2 and 3-on-4. Re-derive all five if the card size changes. */
-.trick-card--seat-0 { --card-from-y: 170px; left: 152px; top: 200px; }
-.trick-card--seat-1 { --card-from-x: -170px; --card-from-y: 34px; left: 7px; top: 131px; transform: rotate(-12deg); }
-.trick-card--seat-2 { --card-from-x: -110px; --card-from-y: -150px; left: 63px; top: 19px; transform: rotate(-5deg); }
-.trick-card--seat-3 { --card-from-x: 110px; --card-from-y: -150px; left: 241px; top: 19px; transform: rotate(5deg); }
-.trick-card--seat-4 { --card-from-x: 170px; --card-from-y: 34px; left: 297px; top: 131px; transform: rotate(12deg); }
+/* One card per seat, at left = rx*(1+cos t), top = ry*(1+sin t) for t at 72-degree steps from
+   the foot of the ellipse. The box origin cancels the card's own size out, so these factors hold
+   at any scale: no card leaves the box, no card's centre — where the rank and suit are drawn —
+   is ever covered, and the worst overlap is 16% at the outer corners of 1-on-2 and 3-on-4. */
+.trick-card--seat-0 { --card-from-x: 0; --card-from-y: calc(1.7 * var(--ry)); left: calc(1.0 * var(--rx)); top: calc(2.0 * var(--ry)); }
+.trick-card--seat-1 { --card-from-x: calc(-1.12 * var(--rx)); --card-from-y: calc(.34 * var(--ry)); left: calc(.0489 * var(--rx)); top: calc(1.309 * var(--ry)); transform: rotate(-12deg); }
+.trick-card--seat-2 { --card-from-x: calc(-.72 * var(--rx)); --card-from-y: calc(-1.5 * var(--ry)); left: calc(.4122 * var(--rx)); top: calc(.191 * var(--ry)); transform: rotate(-5deg); }
+.trick-card--seat-3 { --card-from-x: calc(.72 * var(--rx)); --card-from-y: calc(-1.5 * var(--ry)); left: calc(1.5878 * var(--rx)); top: calc(.191 * var(--ry)); transform: rotate(5deg); }
+.trick-card--seat-4 { --card-from-x: calc(1.12 * var(--rx)); --card-from-y: calc(.34 * var(--ry)); left: calc(1.9511 * var(--rx)); top: calc(1.309 * var(--ry)); transform: rotate(12deg); }
 
 /* An under nobody at this seat may look at — same back as the opponents' hands. */
 .play-card--facedown {
@@ -275,7 +303,7 @@
 }
 
 .play-card__facedown-mark {
-  font-size: 1.9rem;
+  font-size: calc(var(--card-w) * .26);
   font-weight: 900;
   opacity: .55;
 }
@@ -329,18 +357,19 @@
 .human-seat {
   position: absolute;
   left: 50%;
-  bottom: max(220px, calc(env(safe-area-inset-bottom) + 210px));
-  padding: .45rem .75rem;
+  bottom: max(calc(var(--card-h) + 58px), calc(env(safe-area-inset-bottom) + var(--card-h) + 48px));
+  padding: .55rem .95rem;
   border-radius: .65rem;
+  font-size: 1.12rem;
   color: white;
   background: rgb(0 0 0 / 24%);
   transform: translateX(-50%);
 }
 
 .human-seat__score {
-  margin-left: .6rem;
-  font-size: .78rem;
-  opacity: .82;
+  margin-left: .65rem;
+  font-size: .95rem;
+  opacity: .85;
 }
 
 .hand-fan {
@@ -350,14 +379,13 @@
   left: 1rem;
   display: flex;
   justify-content: center;
-  min-height: 188px;
+  min-height: calc(var(--card-h) + 26px);
 }
 
 .play-card--hand {
   position: relative;
-  flex: 0 0 116px;
-  margin-left: -30px;
-  padding: .25rem;
+  flex: 0 0 var(--card-w);
+  margin-left: calc(-1 * var(--fan-overlap));
   cursor: pointer;
   transform-origin: 50% 120%;
   transition: transform .18s, filter .18s, opacity .18s;
@@ -372,24 +400,6 @@
 .play-card--dim {
   filter: saturate(.45);
   opacity: .45;
-}
-
-.play-card__corner {
-  position: absolute;
-  top: .35rem;
-  left: .4rem;
-  display: grid;
-  font-size: 1.4rem;
-  font-weight: 900;
-  line-height: .8;
-}
-
-.play-card__corner small {
-  font-size: 1.18rem;
-}
-
-.play-card__suit {
-  font-size: 3.4rem;
 }
 
 /* Floating centre panel, mirroring the tracked Table View round-result hub. */
@@ -465,25 +475,86 @@
   font-size: .85rem;
 }
 
+/* 1.5x cards. Only where there is room for them: the trick box grows to 630x543 and the
+   8-card burying fan to 1077px, so a shorter or narrower window keeps the base size rather than
+   overflowing. All four scale together — see the note on .online-table. */
+@media (min-height: 1100px) and (min-width: 1120px) {
+  .online-table {
+    --card-w: 174px;
+    --card-h: 243px;
+    --rx: 228px;
+    --ry: 150px;
+    --fan-overlap: 45px;
+  }
+
+  .online-seat {
+    width: 186px;
+    font-size: 1.14rem;
+  }
+
+  .online-seat__name {
+    font-size: 1.2rem;
+  }
+
+  .online-seat__meta {
+    font-size: .98rem;
+  }
+
+  .human-seat {
+    font-size: 1.24rem;
+  }
+
+  .human-seat__score {
+    font-size: 1.05rem;
+  }
+}
+
 @media (max-width: 720px) {
+  .online-table {
+    --card-w: 84px;
+    --card-h: 118px;
+    --rx: 106px;
+    --ry: 72px;
+    /* Proportionally far more overlap than the wider tiers: only 34px of each card shows, which
+       is enough for the corner index, and it is what makes an 8-card hand fit a 360px screen. */
+    --fan-overlap: 50px;
+  }
+
   .online-table__felt {
     min-height: 0;
   }
 
   /* Narrower chips so the ring can reach the edges without running off them. */
+  /* 108px keeps the chip on-screen at left:15% on a 390px phone; wider and it clips. */
   .online-seat {
-    width: 96px;
-    padding: .4rem .3rem;
-    font-size: .72rem;
+    width: 108px;
+    padding: .45rem .35rem;
+    font-size: .84rem;
   }
 
-  .online-seat--opponent-0 { left: 14%; top: 35%; }
-  .online-seat--opponent-1 { left: 32%; top: max(84px, 14%); }
-  .online-seat--opponent-2 { left: 68%; top: max(84px, 14%); }
-  .online-seat--opponent-3 { left: 86%; top: 35%; }
+  .online-seat__name {
+    font-size: .88rem;
+  }
+
+  .online-seat__style {
+    font-size: .64rem;
+  }
+
+  .online-seat--opponent-0 { left: 15%; top: 33%; }
+  .online-seat--opponent-1 { left: 31%; top: max(84px, 14%); }
+  .online-seat--opponent-2 { left: 69%; top: max(84px, 14%); }
+  .online-seat--opponent-3 { left: 85%; top: 33%; }
 
   .online-seat__meta {
-    font-size: .6rem;
+    font-size: .74rem;
+  }
+
+  .human-seat {
+    font-size: .98rem;
+  }
+
+  .human-seat__score {
+    font-size: .82rem;
   }
 
   .dealer-chip {
@@ -504,51 +575,6 @@
     margin-left: -7px;
   }
 
-  .play-card {
-    width: 84px;
-    height: 118px;
-  }
-
-  .play-card--table {
-    font-size: 1.6rem;
-  }
-
-  .play-card__corner {
-    font-size: 1.15rem;
-  }
-
-  .play-card__corner small {
-    font-size: .96rem;
-  }
-
-  .play-card__suit {
-    font-size: 2.5rem;
-  }
-
-  /* Only 34px of each card shows, which is enough for the corner index — the 8-card
-     burying hand has to fit a 360px screen. */
-  .play-card--hand {
-    flex-basis: 84px;
-    margin-left: -50px;
-  }
-
-  /* Tighter still on a phone: the cards overlap more so the ring keeps the edges. */
-  /* Same ellipse scaled for the 84x118 card: rx 106, ry 72 in a 296x262 box. */
-  .trick-area {
-    width: 296px;
-    height: 262px;
-  }
-
-  .trick-card--seat-0 { --card-from-y: 126px; left: 106px; top: 144px; }
-  .trick-card--seat-1 { --card-from-x: -126px; --card-from-y: 24px; left: 5px; top: 94px; }
-  .trick-card--seat-2 { --card-from-x: -82px; --card-from-y: -110px; left: 44px; top: 14px; }
-  .trick-card--seat-3 { --card-from-x: 82px; --card-from-y: -110px; left: 168px; top: 14px; }
-  .trick-card--seat-4 { --card-from-x: 126px; --card-from-y: 24px; left: 207px; top: 94px; }
-
-  .human-seat {
-    bottom: max(174px, calc(env(safe-area-inset-bottom) + 164px));
-  }
-
   .online-table__status {
     top: max(58px, calc(env(safe-area-inset-top) + 48px));
   }
@@ -559,11 +585,9 @@
 
   .hand-fan {
     bottom: max(26px, calc(env(safe-area-inset-bottom) + 16px));
-    min-height: 142px;
   }
 
   .table-status {
-    top: max(202px, calc(env(safe-area-inset-top) + 192px));
     font-size: .78rem;
   }
 }

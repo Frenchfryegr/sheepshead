@@ -95,9 +95,17 @@
                   <p>{{ game.seats[0].name }} {{ game.scores[0] >= 0 ? '+' : '' }}{{ game.scores[0] }} pts</p>
                 </div>
                 <div class="game-card__actions">
-                  <button class="btn btn-primary" type="button" (click)="resume(game)">Open</button>
-                  @if (game.status === 'in_progress') {
-                    <button class="btn btn-secondary" type="button" (click)="abandonSummary(game)" [disabled]="submitting()">Abandon</button>
+                  @if (confirmingDelete() === game.online_game_id) {
+                    <span class="game-card__confirm">Delete permanently?</span>
+                    <button class="btn btn-danger" type="button" (click)="deleteGame(game)" [disabled]="submitting()">Delete</button>
+                    <button class="btn btn-secondary" type="button" (click)="cancelDelete()">Keep</button>
+                  } @else {
+                    <button class="btn btn-primary" type="button" (click)="resume(game)">Open</button>
+                    @if (game.status === 'in_progress') {
+                      <button class="btn btn-secondary" type="button" (click)="abandonSummary(game)" [disabled]="submitting()">Abandon</button>
+                    } @else {
+                      <button class="btn btn-secondary" type="button" (click)="askDelete(game)">Delete</button>
+                    }
                   }
                 </div>
               </article>

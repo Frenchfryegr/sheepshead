@@ -6,6 +6,7 @@ import { environment } from '../../environments/environment'
 import {
   AbandonOnlineGameResponse,
   CreateOnlineGameRequest,
+  DeleteOnlineGameResponse,
   OnlineAction,
   OnlineGameSummary,
   OnlineGameView,
@@ -35,6 +36,11 @@ export class OnlineGameService {
 
   sendAction(id: number, version: number, action: OnlineAction): Observable<OnlineGameView> {
     return this.http.post<OnlineGameView>(`${this.url}/${id}/actions`, { version, action })
+  }
+
+  /** Permanent. The backend refuses unless the game is already finished. */
+  delete(id: number): Observable<DeleteOnlineGameResponse> {
+    return this.http.delete<DeleteOnlineGameResponse>(`${this.url}/${id}`)
   }
 
   abandon(id: number, version: number): Observable<AbandonOnlineGameResponse> {

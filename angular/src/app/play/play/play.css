@@ -251,7 +251,15 @@
 
 .game-card__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: .5rem;
+}
+
+.game-card__confirm {
+  color: #b83e37;
+  font-size: .85rem;
+  font-weight: 700;
 }
 
 @media (max-width: 560px) {

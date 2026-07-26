@@ -122,6 +122,11 @@ export interface CreateOnlineGameRequest {
   seat_names?: string[]
 }
 
+export interface DeleteOnlineGameResponse {
+  online_game_id: number
+  deleted: true
+}
+
 export interface AbandonOnlineGameResponse {
   online_game_id: number
   status: 'abandoned'

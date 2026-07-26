@@ -2000,6 +2000,32 @@ def submit_online_action(
     return _online_view(update.data[0], state, events)
 
 
+@app.delete("/online-games/{online_game_id}", tags=["Online Play"])
+def delete_online_game(
+    online_game_id: int,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Permanently remove a finished game. `OnlineGameActions` cascades with it.
+
+    In-progress games must be abandoned first. That is not squeamishness — it keeps the
+    irreversible step separate from the one that ends a game, so a live table cannot be
+    discarded by a single mis-tap.
+    """
+    row = _online_game_row(online_game_id, user_id)
+    if row["status"] == "in_progress":
+        raise HTTPException(status_code=409, detail="Abandon the game before deleting it")
+    # The owner filter is repeated on the delete itself rather than relying on the lookup
+    # above: this is the statement that destroys data, so it carries its own guard.
+    (
+        supabase.table(TABLE_NAMES.ONLINE_GAMES.value)
+        .delete()
+        .eq("online_game_id", online_game_id)
+        .eq("owner_user_id", user_id)
+        .execute()
+    )
+    return {"online_game_id": online_game_id, "deleted": True}
+
+
 @app.post("/online-games/{online_game_id}/abandon", tags=["Online Play"])
 def abandon_online_game(
     online_game_id: int,

@@ -56,15 +56,14 @@
             <span class="play-card__order">{{ $index + 1 }}</span>
           </div>
         } @else {
-          @let parts = cardParts(play.card);
           <div
-            [class]="'play-card play-card--table trick-card--seat-' + play.seat"
-            [class.play-card--red]="parts.red"
+            [class]="'play-card play-card--art play-card--table trick-card--seat-' + play.seat"
+            [style.background-position]="spritePosition(play.card)"
             [class.play-card--fresh]="animatingCard() === play.seat + ':' + play.card"
             [class.play-card--winner]="trickWinnerSeat() === play.seat"
             [class.play-card--under]="play.under"
+            [attr.aria-label]="cardLabel(play.card)"
           >
-            <span>{{ parts.rank }}</span><span>{{ parts.suit }}</span>
             <span class="play-card__order">{{ $index + 1 }}</span>
           </div>
         }
@@ -181,20 +180,16 @@
 
     <div class="hand-fan" aria-label="Your hand">
       @for (card of game().hand; track card) {
-        @let parts = cardParts(card);
         <button
           type="button"
-          class="play-card play-card--hand"
-          [class.play-card--red]="parts.red"
+          class="play-card play-card--art play-card--hand"
+          [style.background-position]="spritePosition(card)"
           [class.play-card--selected]="selectedBury().includes(card) || selectedUnder() === card"
           [class.play-card--dim]="showPlayableHint() && !playableCards().has(card)"
           [disabled]="disabled() || !humanTurn() || (game().phase !== 'burying' && !pendingUnderCall() && !playableCards().has(card))"
           (click)="chooseCard(card)"
-          [attr.aria-label]="'Play ' + parts.rank + ' ' + parts.suit"
-        >
-          <span class="play-card__corner">{{ parts.rank }}<small>{{ parts.suit }}</small></span>
-          <span class="play-card__suit">{{ parts.suit }}</span>
-        </button>
+          [attr.aria-label]="'Play the ' + cardLabel(card)"
+        ></button>
       }
     </div>
   </div>

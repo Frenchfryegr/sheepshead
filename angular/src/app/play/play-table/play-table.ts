@@ -185,6 +185,46 @@ export class PlayTable {
     return null
   }
 
+  /**
+   * Card faces come from a 13x4 sprite (`/cards/faces.png`). The engine's two-character card
+   * string is the key directly — rank then suit, with `T` for ten.
+   *
+   * Positions are percentages, not pixels, so the sheet's resolution is irrelevant: swapping in
+   * a higher-resolution sheet needs no code change. Note the divisor is one less than the count
+   * — with a percentage background-size, `100%` means right-aligned, not one cell across.
+   */
+  private static readonly RANK_COLUMNS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
+  private static readonly SUIT_ROWS = ['H', 'C', 'D', 'S']
+  private static readonly spriteCache = new Map<string, string>()
+
+  spritePosition(card: OnlineCard): string {
+    const cached = PlayTable.spriteCache.get(card)
+    if (cached) return cached
+    const column = PlayTable.RANK_COLUMNS.indexOf(card.slice(0, -1))
+    const row = PlayTable.SUIT_ROWS.indexOf(card.slice(-1))
+    const x = (column / (PlayTable.RANK_COLUMNS.length - 1)) * 100
+    const y = (row / (PlayTable.SUIT_ROWS.length - 1)) * 100
+    const value = `${x}% ${y}%`
+    PlayTable.spriteCache.set(card, value)
+    return value
+  }
+
+  private static readonly RANK_WORDS: Record<string, string> = {
+    '7': 'Seven', '8': 'Eight', '9': 'Nine', T: 'Ten',
+    J: 'Jack', Q: 'Queen', K: 'King', A: 'Ace',
+  }
+  private static readonly SUIT_WORDS: Record<string, string> = {
+    C: 'clubs', S: 'spades', H: 'hearts', D: 'diamonds',
+  }
+
+  /** The only description of a card once the glyphs are gone, so it spells the suit out. */
+  cardLabel(card: OnlineCard): string {
+    const rank = PlayTable.RANK_WORDS[card.slice(0, -1)] ?? card.slice(0, -1)
+    const suit = PlayTable.SUIT_WORDS[card.slice(-1)] ?? card.slice(-1)
+    return `${rank} of ${suit}`
+  }
+
+  /** Still used for the contract announcement, which reads better as "the A♥". */
   cardParts(card: OnlineCard): { rank: string, suit: string, red: boolean } {
     const suitCode = card.slice(-1)
     const suits: Record<string, string> = { C: '♣', S: '♠', H: '♥', D: '♦' }

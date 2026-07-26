@@ -35,6 +35,12 @@ export class Play implements OnInit, OnDestroy {
   /** '' means a mixed table: the backend deals playstyles out at random. */
   tableStyle = signal('')
   playstyles = signal<OnlinePlaystyle[]>([])
+  /**
+   * The game the player has armed for deletion, if any. Two-step because this is the only
+   * irreversible action in the lobby, and holding it per-game makes it obvious *which*
+   * table is about to go — which a shared confirm dialog would not.
+   */
+  confirmingDelete = signal<number | null>(null)
   private nextHandResolve: (() => void) | null = null
   private playbackRun = 0
 
@@ -127,6 +133,37 @@ export class Play implements OnInit, OnDestroy {
         this.submitting.set(false)
         if (error instanceof HttpErrorResponse && error.status === 409) {
           this.reloadActiveGame(game.online_game_id)
+        } else {
+          this.handleError(error)
+        }
+      },
+    })
+  }
+
+  askDelete(game: OnlineGameSummary): void {
+    this.confirmingDelete.set(game.online_game_id)
+  }
+
+  cancelDelete(): void {
+    this.confirmingDelete.set(null)
+  }
+
+  deleteGame(game: OnlineGameSummary): void {
+    if (this.submitting()) return
+    this.submitting.set(true)
+    this.service.delete(game.online_game_id).subscribe({
+      next: () => {
+        this.submitting.set(false)
+        this.confirmingDelete.set(null)
+        this.refreshGames()
+      },
+      error: error => {
+        this.submitting.set(false)
+        this.confirmingDelete.set(null)
+        // A 409 means it went back to in-progress, or was already gone — either way the list
+        // on screen is stale, so reload rather than guess.
+        if (error instanceof HttpErrorResponse && error.status === 409) {
+          this.refreshGames()
         } else {
           this.handleError(error)
         }
