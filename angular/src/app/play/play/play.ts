@@ -30,7 +30,7 @@ export class Play implements OnInit, OnDestroy {
   animatingCard = signal<string | null>(null)
   trickWinnerSeat = signal<number | null>(null)
   gameMenuOpen = signal(false)
-  gameSpeed = signal<GameSpeed>('fast')
+  gameSpeed = signal<GameSpeed>('medium')
   readonly gameSpeeds: GameSpeed[] = ['slow', 'medium', 'fast']
   /** '' means a mixed table: the backend deals playstyles out at random. */
   tableStyle = signal('')
@@ -99,12 +99,18 @@ export class Play implements OnInit, OnDestroy {
   }
 
   closeTable(): void {
+    // Bumping the run cancels any playback in flight. That playback clears `submitting` only
+    // after its abort checks, so it never gets there — leaving the flag stuck true, which
+    // disables the lobby's New game button ("Dealing...") and every card on re-entry. Whoever
+    // cancels a run owns resetting the state it was going to reset.
     this.playbackRun += 1
+    this.submitting.set(false)
     this.activeGame.set(null)
     this.playbackMessage.set(null)
     this.animatingCard.set(null)
     this.trickWinnerSeat.set(null)
     this.gameMenuOpen.set(false)
+    this.error.set(null)
     this.continueToNextHand()
     void this.tableDisplay.disable()
     this.refreshGames()
@@ -240,6 +246,7 @@ export class Play implements OnInit, OnDestroy {
     }
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     for (const event of response.events) {
+      // Superseded: closeTable cancelled us and has already reset the shared state.
       if (run !== this.playbackRun) return
       this.playbackMessage.set(this.describeEvent(event, response))
       const current = this.activeGame()

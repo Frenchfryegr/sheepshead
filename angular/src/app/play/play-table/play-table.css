@@ -431,6 +431,76 @@
   font-weight: 700;
 }
 
+/* The end-of-hand scoreboard needs a table's worth of width, which the action prompts do not. */
+.table-prompt--board {
+  max-width: min(94%, 550px);
+  gap: .6rem;
+}
+
+.table-prompt__eyebrow {
+  margin: 0;
+  color: rgb(243 244 246 / 55%);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.scoreboard {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreboard th,
+.scoreboard td {
+  padding: .3rem .35rem;
+  text-align: right;
+}
+
+.scoreboard thead th {
+  border-bottom: 1px solid rgb(255 255 255 / 16%);
+  color: rgb(243 244 246 / 48%);
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.scoreboard__name {
+  text-align: left;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.scoreboard__role {
+  margin-left: .35rem;
+  padding: .05rem .3rem;
+  border-radius: 99px;
+  color: #2d2410;
+  background: #ebca68;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* The player's own row, so their result is findable without reading names. */
+.scoreboard__row--you {
+  background: rgb(255 255 255 / 8%);
+}
+
+.scoreboard__delta {
+  font-weight: 800;
+}
+
+.scoreboard__delta--up { color: #7fdca4; }
+.scoreboard__delta--down { color: #f0928c; }
+
+.scoreboard__total {
+  color: rgb(243 244 246 / 72%);
+}
+
 .table-prompt__hint {
   margin: -.35rem 0 0;
   color: rgb(243 244 246 / 62%);

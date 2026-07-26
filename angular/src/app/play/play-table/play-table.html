@@ -71,18 +71,43 @@
     </div>
 
     @if (showPrompt()) {
-      <div class="table-prompt" role="group" aria-label="Your decision">
+      <div class="table-prompt" [class.table-prompt--board]="awaitingNextHand()" role="group" aria-label="Your decision">
         @if (awaitingNextHand()) {
           @if (latestResult(); as result) {
+            <p class="table-prompt__eyebrow">Hand {{ result.hand_number }}</p>
             <p class="table-prompt__title">{{ resultTitle(result) }}</p>
-            <p class="table-prompt__hint">
-              @if (result.picker_team_points !== null) {
-                {{ result.picker_team_points }} team points
-              }
-              @if (result.multiplier > 1) {
-                · ×{{ result.multiplier }}
-              }
-            </p>
+            @if (resultDetail(result); as detail) {
+              <p class="table-prompt__hint">{{ detail }}</p>
+            }
+            <table class="scoreboard">
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th scope="col">Pts</th>
+                  <th scope="col">+/−</th>
+                  <th scope="col">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (seat of game().seats; track seat.index) {
+                  <tr [class.scoreboard__row--you]="seat.index === game().seat">
+                    <th scope="row" class="scoreboard__name">
+                      {{ seat.name }}
+                      @if (scoreRole(result, seat.index); as role) {
+                        <span class="scoreboard__role">{{ role }}</span>
+                      }
+                    </th>
+                    <td>{{ result.points[seat.index] }}</td>
+                    <td
+                      class="scoreboard__delta"
+                      [class.scoreboard__delta--up]="result.deltas[seat.index] > 0"
+                      [class.scoreboard__delta--down]="result.deltas[seat.index] < 0"
+                    >{{ result.deltas[seat.index] > 0 ? '+' : '' }}{{ result.deltas[seat.index] }}</td>
+                    <td class="scoreboard__total">{{ game().scores[seat.index] }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           } @else {
             <p class="table-prompt__title">Hand complete</p>
           }

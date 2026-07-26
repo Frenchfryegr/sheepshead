@@ -309,6 +309,30 @@ export class PlayTable {
     this.historyDialog?.nativeElement.close()
   }
 
+  /** Picker / Partner / leaster winner, for the scoreboard's name column. */
+  scoreRole(result: OnlineHandResult, seat: number): string | null {
+    if (result.kind === 'leaster') return result.leaster_winner === seat ? 'Winner' : null
+    if (result.picker_seat === seat) return 'Picker'
+    if (result.partner_seat === seat) return 'Partner'
+    return null
+  }
+
+  /**
+   * The supporting line under the headline: where the 120 went, and why the stake doubled or
+   * tripled. Reads the multiplier rather than the no_schneider/no_trick flags, which are named
+   * for the scoring code's convenience rather than for a player's.
+   */
+  resultDetail(result: OnlineHandResult): string {
+    const parts: string[] = []
+    if (result.picker_team_points !== null) {
+      parts.push(`${result.picker_team_points} of 120 to the picker's team`)
+    }
+    if (result.buried_points > 0) parts.push(`${result.buried_points} buried`)
+    if (result.multiplier === 3) parts.push('No Tricker')
+    else if (result.multiplier === 2) parts.push('No Schneider')
+    return parts.join(' · ')
+  }
+
   resultTitle(result: OnlineHandResult): string {
     if (result.kind === 'leaster') {
       // A tied leaster has no winner at all and nobody scores, so there is no seat to name.
