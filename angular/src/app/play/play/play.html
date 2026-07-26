@@ -1,0 +1,117 @@
+<main class="play-page" [class.play-page--active]="activeGame()">
+  @if (activeGame(); as game) {
+    <div class="play-page__toolbar">
+      <button class="btn btn-secondary" type="button" (click)="closeTable()">Back to lobby</button>
+      <button class="btn play-page__abandon" type="button" (click)="abandonActive()" [disabled]="submitting()">Abandon game</button>
+    </div>
+    <div class="game-menu">
+      <button
+        class="game-menu__toggle"
+        type="button"
+        aria-label="Game settings"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="gameMenuOpen()"
+        (click)="gameMenuOpen.set(!gameMenuOpen())"
+      >
+        <span aria-hidden="true">☰</span>
+      </button>
+      @if (gameMenuOpen()) {
+        <div class="game-menu__panel" role="menu" aria-label="Game settings">
+          <span class="game-menu__heading">Game speed</span>
+          @for (speed of gameSpeeds; track speed) {
+            <button
+              class="game-menu__option"
+              type="button"
+              role="menuitemradio"
+              [attr.aria-checked]="gameSpeed() === speed"
+              [class.game-menu__option--selected]="gameSpeed() === speed"
+              (click)="setGameSpeed(speed)"
+            >
+              <span>{{ speed | titlecase }}</span>
+              @if (gameSpeed() === speed) {
+                <span aria-hidden="true">✓</span>
+              }
+            </button>
+          }
+        </div>
+      }
+    </div>
+    @if (error()) {
+      <p class="play-page__error" role="alert">{{ error() }}</p>
+    }
+    <app-play-table
+      [game]="game"
+      [disabled]="submitting() || game.status !== 'in_progress'"
+      [playbackMessage]="playbackMessage()"
+      [playbackResult]="playbackResult()"
+      [awaitingNextHand]="awaitingNextHand()"
+      [animatingCard]="animatingCard()"
+      [trickWinnerSeat]="trickWinnerSeat()"
+      (action)="sendAction($event)"
+      (nextHand)="continueToNextHand()"
+    />
+  } @else {
+    <section class="play-lobby">
+      <div class="play-lobby__hero">
+        <p class="play-lobby__eyebrow">Five-handed Sheepshead</p>
+        <p>Play against four AI opponents. Your hand is saved after every move.</p>
+        <div class="play-lobby__new">
+          <label>
+            Opponents
+            <select class="input" [ngModel]="tableStyle()" (ngModelChange)="tableStyle.set($event)">
+              <option value="">Mixed table</option>
+              @for (style of playstyles(); track style.key) {
+                <option [value]="style.key">All {{ style.name }}</option>
+              }
+              <option value="random">Random cards (practice)</option>
+            </select>
+          </label>
+          <button class="btn btn-primary" type="button" (click)="createGame()" [disabled]="submitting()">
+            {{ submitting() ? 'Dealing…' : 'New game' }}
+          </button>
+        </div>
+      </div>
+
+      @if (error()) {
+        <p class="play-page__error" role="alert">{{ error() }}</p>
+      }
+
+      <section class="play-lobby__games">
+        <h2>Your games</h2>
+        @if (loading()) {
+          <p class="text-muted">Loading your tables…</p>
+        } @else if (games().length === 0) {
+          <p class="play-lobby__empty">No games yet. Deal your first hand above.</p>
+        } @else {
+          <div class="play-lobby__list">
+            @for (game of games(); track game.online_game_id) {
+              <article class="game-card">
+                <div>
+                  <span class="game-card__status" [class.game-card__status--closed]="game.status !== 'in_progress'">
+                    {{ game.status === 'in_progress' ? 'In progress' : game.status }}
+                  </span>
+                  <h3>Hand {{ game.hand_number }}</h3>
+                  <p>{{ game.seats[0].name }} {{ game.scores[0] >= 0 ? '+' : '' }}{{ game.scores[0] }} pts</p>
+                </div>
+                <div class="game-card__actions">
+                  @if (confirmingDelete() === game.online_game_id) {
+                    <span class="game-card__confirm">Delete permanently?</span>
+                    <button class="btn btn-danger" type="button" (click)="deleteGame(game)" [disabled]="submitting()">Delete</button>
+                    <button class="btn btn-secondary" type="button" (click)="cancelDelete()">Keep</button>
+                  } @else {
+                    <button class="btn btn-primary" type="button" (click)="resume(game)">Open</button>
+                    @if (game.status === 'in_progress') {
+                      <button class="btn btn-secondary" type="button" (click)="abandonSummary(game)" [disabled]="submitting()">Abandon</button>
+                    } @else {
+                      <button class="btn btn-secondary" type="button" (click)="askDelete(game)">Delete</button>
+                    }
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+    </section>
+  }
+</main>

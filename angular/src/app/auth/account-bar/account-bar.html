@@ -4,6 +4,9 @@
     <a class="account-bar__link" routerLink="/badges" routerLinkActive="account-bar__link--active">Badges</a>
     <a class="account-bar__link" routerLink="/achievements" routerLinkActive="account-bar__link--active">Achievements</a>
     <a class="account-bar__link" routerLink="/statistics" routerLinkActive="account-bar__link--active">Stats</a>
+    @if (authService.isAuthenticated()) {
+      <a class="account-bar__link" routerLink="/play" routerLinkActive="account-bar__link--active">Play</a>
+    }
   </nav>
   <div class="account-bar__account">
     @if (authService.isAuthenticated()) {

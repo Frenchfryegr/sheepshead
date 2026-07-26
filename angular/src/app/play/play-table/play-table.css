@@ -1,0 +1,706 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The whole table geometry derives from four numbers. Card size and the ellipse the trick sits
+   on must move together — change one alone and the cards either overlap or drift apart — so they
+   are declared as a set here and everything else is calc()'d from them. To resize the cards,
+   scale all four by the same factor and nothing else needs touching. */
+.online-table {
+  --card-w: 116px;
+  --card-h: 162px;
+  --rx: 152px;   /* trick ellipse, horizontal */
+  --ry: 100px;   /* trick ellipse, vertical */
+  --fan-overlap: 30px;
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  color: #f3f4f6;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.online-table__status {
+  position: absolute;
+  z-index: 20;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  left: max(12px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.online-table__status > div {
+  display: grid;
+  text-align: center;
+}
+
+.online-table__status span {
+  color: rgb(243 244 246 / 65%);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.table-link {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  border: 0;
+  border-radius: 999px;
+  padding: .5rem .75rem;
+  color: rgb(243 244 246 / 82%);
+  background: rgb(0 0 0 / 24%);
+  text-decoration: underline;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+}
+
+.online-table__felt {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(to bottom, rgb(11 32 25 / 0%) calc(100% - 150px), #0b2019 100%),
+    radial-gradient(circle at 50% 43%, #2e835e, #15543b 66%, #0b2019);
+  box-shadow: inset 0 0 70px rgb(0 0 0 / 32%);
+}
+
+.seat-arc {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Seats sit on an ellipse around the trick, with the player at its foot. Percentages rather
+   than pixels so the ring keeps its shape as the viewport changes. */
+.online-seat {
+  position: absolute;
+  width: 158px;
+  padding: .6rem .55rem;
+  font-size: 1.02rem;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: .75rem;
+  color: #fff;
+  background: rgb(0 0 0 / 34%);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  transition: box-shadow .2s, transform .2s;
+  backdrop-filter: blur(4px);
+}
+
+/* Clockwise from the player: seat 1 is on their left, seat 4 on their right. */
+.online-seat--opponent-0 { left: 11%; top: 40%; }
+.online-seat--opponent-1 { left: 30%; top: max(76px, 13%); }
+.online-seat--opponent-2 { left: 70%; top: max(76px, 13%); }
+.online-seat--opponent-3 { left: 89%; top: 40%; }
+
+.online-seat--turn,
+.human-seat--turn {
+  box-shadow: 0 0 0 3px #ebca68, 0 0 24px rgb(235 202 104 / 50%);
+}
+
+.online-seat__name {
+  font-size: 1.06rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.online-seat__style {
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .6;
+}
+
+.online-seat__meta {
+  margin-top: .35rem;
+  font-size: .88rem;
+  opacity: .85;
+}
+
+/* Dealer button, sitting on the corner of the seat like the real thing. Both .online-seat
+   and .human-seat are positioned, so the negative offsets anchor to whichever it is in. */
+.dealer-chip {
+  position: absolute;
+  z-index: 2;
+  top: -10px;
+  right: -10px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid rgb(29 37 33 / 55%);
+  border-radius: 50%;
+  color: #1d2521;
+  background: #fdf6e2;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
+  font-size: .74rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* The picker's face-down under, parked at their seat so the whole table can see they are
+   holding one. Opposite corner to the dealer button, and gone once the card is played — at
+   which point it appears in the trick instead. */
+.under-marker {
+  position: absolute;
+  z-index: 2;
+  top: -10px;
+  left: -10px;
+  width: 21px;
+  height: 29px;
+  border: 1px solid #e9ddc5;
+  border-radius: 3px;
+  background: repeating-linear-gradient(45deg, #173d65, #173d65 4px, #2b5e8c 4px, #2b5e8c 8px);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
+  transform: rotate(-9deg);
+}
+
+.role-chip {
+  display: inline-block;
+  margin-left: .3rem;
+  padding: .1rem .35rem;
+  border-radius: 99px;
+  color: #2d2410;
+  background: #ebca68;
+  font-size: .74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.card-backs {
+  display: flex;
+  justify-content: center;
+  height: 30px;
+  margin-top: .3rem;
+}
+
+.card-back {
+  width: 19px;
+  height: 28px;
+  margin-left: -9px;
+  border: 1px solid #e9ddc5;
+  border-radius: 3px;
+  background: repeating-linear-gradient(45deg, #173d65, #173d65 3px, #2b5e8c 3px, #2b5e8c 6px);
+}
+
+/* Dropped a little below centre and pulled in tight: the cards cluster near the middle so the
+   seats can occupy the edges without fighting them. */
+.trick-area {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  width: calc(2 * var(--rx) + var(--card-w));
+  height: calc(2 * var(--ry) + var(--card-h));
+  transform: translate(-50%, -50%);
+}
+
+/* Contract announcement: what this hand is. Shows itself for a few seconds and leaves.
+   Never interactive — pointer-events is off so a card underneath stays tappable. */
+.table-announce {
+  position: absolute;
+  z-index: 17;
+  top: 41%;
+  left: 50%;
+  max-width: min(86%, 380px);
+  margin: 0;
+  padding: .8rem 1.4rem;
+  border: 1px solid rgb(242 211 111 / 45%);
+  border-radius: 999px;
+  color: #fdf6e2;
+  background: rgb(8 24 18 / 92%);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 55%);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  /* Duration must match PlayTable.ANNOUNCEMENT_MS, which removes the element. */
+  animation: announce 3500ms ease both;
+}
+
+/* Every step keeps the -50% Y that centres it against `top: 41%`; only the small offset and
+   the scale move. Dropping it from one step would make the banner jump half its height. */
+@keyframes announce {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% - 10px)) scale(.96); }
+  8%, 78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 10px)) scale(.98); }
+}
+
+/* Transient status. Sits above the trick rather than over it, so a card landing is never
+   hidden by the commentary describing it. */
+.table-status {
+  position: absolute;
+  z-index: 14;
+  /* Between the top seats and the trick: the trick's own top edge, less a gap. */
+  top: max(150px, calc(47% - var(--ry) - var(--card-h) / 2 - 44px));
+  left: 50%;
+  max-width: min(80%, 340px);
+  margin: 0;
+  padding: .4rem .9rem;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 88%);
+  background: rgb(8 24 18 / 72%);
+  font-size: .85rem;
+  text-align: center;
+  transform: translateX(-50%);
+  backdrop-filter: blur(6px);
+}
+
+.play-card {
+  width: var(--card-w);
+  height: var(--card-h);
+  border: 1px solid #d7d1c5;
+  border-radius: calc(var(--card-w) * .078);
+  color: #1d2521;
+  background: #fffdf8;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 22%);
+}
+
+/* The sheet is pip art on transparency — it contains no card body, so .play-card's own cream
+   rectangle *is* the card and this only paints the markings onto it. Percentage sizing means the
+   sheet's resolution is irrelevant; a larger sheet drops in with no other change. */
+.play-card--art {
+  background-image: url('/cards/faces.png');
+  background-repeat: no-repeat;
+  background-size: 1300% 400%;   /* 13 columns x 4 rows */
+}
+
+/* Nearest-neighbour only where the sheet is being *enlarged*.
+   The 142px cell has to fill a 116px card, so at 1dppx it is scaled DOWN — and pixelated is
+   nearest-neighbour in both directions, dropping source pixels instead of averaging them, which
+   breaks the thin lines in this art. Measured on a 1440p monitor at 100%: visibly worse than
+   smooth. Above 1.5dppx the cell is enlarged instead (1.63x at 2x, 1.77x on a 3x phone), and
+   nearest-neighbour is what keeps hard-edged art crisp rather than blurred.
+   crisp-edges first for browsers that only understand that spelling. */
+@media (min-resolution: 1.5dppx) {
+  .play-card--art {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+  }
+}
+
+.play-card--table {
+  --card-from-x: 0;
+  --card-from-y: 0;
+  position: absolute;
+  transition: transform .3s, opacity .3s;
+}
+
+/* One card per seat, at left = rx*(1+cos t), top = ry*(1+sin t) for t at 72-degree steps from
+   the foot of the ellipse. The box origin cancels the card's own size out, so these factors hold
+   at any scale: no card leaves the box, no card's centre — where the rank and suit are drawn —
+   is ever covered, and the worst overlap is 16% at the outer corners of 1-on-2 and 3-on-4. */
+.trick-card--seat-0 { --card-from-x: 0; --card-from-y: calc(1.7 * var(--ry)); left: calc(1.0 * var(--rx)); top: calc(2.0 * var(--ry)); }
+.trick-card--seat-1 { --card-from-x: calc(-1.12 * var(--rx)); --card-from-y: calc(.34 * var(--ry)); left: calc(.0489 * var(--rx)); top: calc(1.309 * var(--ry)); transform: rotate(-12deg); }
+.trick-card--seat-2 { --card-from-x: calc(-.72 * var(--rx)); --card-from-y: calc(-1.5 * var(--ry)); left: calc(.4122 * var(--rx)); top: calc(.191 * var(--ry)); transform: rotate(-5deg); }
+.trick-card--seat-3 { --card-from-x: calc(.72 * var(--rx)); --card-from-y: calc(-1.5 * var(--ry)); left: calc(1.5878 * var(--rx)); top: calc(.191 * var(--ry)); transform: rotate(5deg); }
+.trick-card--seat-4 { --card-from-x: calc(1.12 * var(--rx)); --card-from-y: calc(.34 * var(--ry)); left: calc(1.9511 * var(--rx)); top: calc(1.309 * var(--ry)); transform: rotate(12deg); }
+
+/* An under nobody at this seat may look at — same back as the opponents' hands. */
+.play-card--facedown {
+  border-color: #e9ddc5;
+  color: rgb(255 255 255 / 72%);
+  background: repeating-linear-gradient(45deg, #173d65, #173d65 6px, #2b5e8c 6px, #2b5e8c 12px);
+}
+
+.play-card__facedown-mark {
+  font-size: calc(var(--card-w) * .26);
+  font-weight: 900;
+  opacity: .55;
+}
+
+/* The picker's own under, face up to them alone. */
+.play-card--under {
+  outline: 3px dashed rgb(242 211 111 / 85%);
+  outline-offset: -5px;
+}
+
+.play-card--fresh {
+  animation: card-arrive 220ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.play-card--winner {
+  z-index: 3;
+  outline: 4px solid #f2d36f;
+  box-shadow: 0 0 24px rgb(242 211 111 / 85%);
+}
+
+.play-card__order {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  color: #183c2e;
+  background: #f2d36f;
+  box-shadow: 0 2px 7px rgb(0 0 0 / 28%);
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+@keyframes card-arrive {
+  from {
+    opacity: 0;
+    scale: .7;
+    translate: var(--card-from-x) var(--card-from-y);
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+.human-seat {
+  position: absolute;
+  left: 50%;
+  bottom: max(calc(var(--card-h) + 58px), calc(env(safe-area-inset-bottom) + var(--card-h) + 48px));
+  padding: .55rem .95rem;
+  border-radius: .65rem;
+  font-size: 1.12rem;
+  color: white;
+  background: rgb(0 0 0 / 24%);
+  transform: translateX(-50%);
+}
+
+.human-seat__score {
+  margin-left: .65rem;
+  font-size: .95rem;
+  opacity: .85;
+}
+
+.hand-fan {
+  position: absolute;
+  right: 1rem;
+  bottom: max(26px, calc(env(safe-area-inset-bottom) + 16px));
+  left: 1rem;
+  display: flex;
+  justify-content: center;
+  min-height: calc(var(--card-h) + 26px);
+}
+
+.play-card--hand {
+  position: relative;
+  flex: 0 0 var(--card-w);
+  margin-left: calc(-1 * var(--fan-overlap));
+  cursor: pointer;
+  transform-origin: 50% 120%;
+  transition: transform .18s, filter .18s, opacity .18s;
+}
+
+.play-card--hand:not(:disabled):hover,
+.play-card--selected {
+  z-index: 2;
+  transform: translateY(-18px);
+}
+
+.play-card--dim {
+  filter: saturate(.45);
+  opacity: .45;
+}
+
+/* Floating centre panel, mirroring the tracked Table View round-result hub. */
+.table-prompt {
+  position: absolute;
+  z-index: 16;
+  top: 41%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .85rem;
+  width: max-content;
+  max-width: min(84%, 320px);
+  padding: 1.1rem 1.25rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 18px;
+  color: #f3f4f6;
+  background: rgb(8 24 18 / 92%);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 55%);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(8px);
+}
+
+.table-prompt__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* The end-of-hand scoreboard needs a table's worth of width, which the action prompts do not. */
+.table-prompt--board {
+  max-width: min(94%, 550px);
+  gap: .6rem;
+}
+
+.table-prompt__eyebrow {
+  margin: 0;
+  color: rgb(243 244 246 / 55%);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.scoreboard {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreboard th,
+.scoreboard td {
+  padding: .3rem .35rem;
+  text-align: right;
+}
+
+.scoreboard thead th {
+  border-bottom: 1px solid rgb(255 255 255 / 16%);
+  color: rgb(243 244 246 / 48%);
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.scoreboard__name {
+  text-align: left;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.scoreboard__role {
+  margin-left: .35rem;
+  padding: .05rem .3rem;
+  border-radius: 99px;
+  color: #2d2410;
+  background: #ebca68;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* The player's own row, so their result is findable without reading names. */
+.scoreboard__row--you {
+  background: rgb(255 255 255 / 8%);
+}
+
+.scoreboard__delta {
+  font-weight: 800;
+}
+
+.scoreboard__delta--up { color: #7fdca4; }
+.scoreboard__delta--down { color: #f0928c; }
+
+.scoreboard__total {
+  color: rgb(243 244 246 / 72%);
+}
+
+.table-prompt__hint {
+  margin: -.35rem 0 0;
+  color: rgb(243 244 246 / 62%);
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.table-prompt__actions {
+  display: flex;
+  justify-content: center;
+  gap: .6rem;
+}
+
+.table-prompt__actions .btn {
+  min-width: 96px;
+  min-height: 44px;
+}
+
+.history-dialog {
+  width: min(580px, calc(100% - 2rem));
+  max-height: 80vh;
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: 0 20px 70px rgb(0 0 0 / 30%);
+}
+
+.history-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.history-dialog ol {
+  display: grid;
+  gap: .75rem;
+  padding-left: 1.5rem;
+}
+
+.history-dialog li span {
+  display: block;
+  color: #68736d;
+  font-size: .85rem;
+}
+
+/* 1.5x cards. Only where there is room for them: the trick box grows to 630x543 and the
+   8-card burying fan to 1077px, so a shorter or narrower window keeps the base size rather than
+   overflowing. All four scale together — see the note on .online-table. */
+@media (min-height: 1100px) and (min-width: 1120px) {
+  .online-table {
+    --card-w: 174px;
+    --card-h: 243px;
+    --rx: 228px;
+    --ry: 150px;
+    --fan-overlap: 45px;
+  }
+
+  .online-seat {
+    width: 186px;
+    font-size: 1.14rem;
+  }
+
+  .online-seat__name {
+    font-size: 1.2rem;
+  }
+
+  .online-seat__meta {
+    font-size: .98rem;
+  }
+
+  .human-seat {
+    font-size: 1.24rem;
+  }
+
+  .human-seat__score {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .online-table {
+    --card-w: 84px;
+    --card-h: 118px;
+    --rx: 106px;
+    --ry: 72px;
+    /* Proportionally far more overlap than the wider tiers: only 34px of each card shows, which
+       is enough for the corner index, and it is what makes an 8-card hand fit a 360px screen. */
+    --fan-overlap: 50px;
+  }
+
+  .online-table__felt {
+    min-height: 0;
+  }
+
+  /* Narrower chips so the ring can reach the edges without running off them. */
+  /* 108px keeps the chip on-screen at left:15% on a 390px phone; wider and it clips. */
+  .online-seat {
+    width: 108px;
+    padding: .45rem .35rem;
+    font-size: .84rem;
+  }
+
+  .online-seat__name {
+    font-size: .88rem;
+  }
+
+  .online-seat__style {
+    font-size: .64rem;
+  }
+
+  .online-seat--opponent-0 { left: 15%; top: 33%; }
+  .online-seat--opponent-1 { left: 31%; top: max(84px, 14%); }
+  .online-seat--opponent-2 { left: 69%; top: max(84px, 14%); }
+  .online-seat--opponent-3 { left: 85%; top: 33%; }
+
+  .online-seat__meta {
+    font-size: .74rem;
+  }
+
+  .human-seat {
+    font-size: .98rem;
+  }
+
+  .human-seat__score {
+    font-size: .82rem;
+  }
+
+  .dealer-chip {
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    font-size: .64rem;
+  }
+
+  .under-marker {
+    top: -8px;
+    left: -8px;
+    width: 17px;
+    height: 24px;
+  }
+
+  .card-backs {
+    height: 24px;
+  }
+
+  .card-back {
+    width: 15px;
+    height: 22px;
+    margin-left: -7px;
+  }
+
+  .online-table__status {
+    top: max(58px, calc(env(safe-area-inset-top) + 48px));
+  }
+
+  .online-table__status .table-link {
+    top: 4px;
+  }
+
+  .hand-fan {
+    bottom: max(26px, calc(env(safe-area-inset-bottom) + 16px));
+  }
+
+  .table-status {
+    font-size: .78rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-card,
+  .online-seat {
+    transition-duration: .01ms;
+  }
+
+  .play-card--fresh {
+    animation-duration: 80ms;
+  }
+
+  /* Keep the banner up for its full time — the timer, not the animation, removes it — but
+     drop the movement and fade it straight in. */
+  .table-announce {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    animation: none;
+  }
+}

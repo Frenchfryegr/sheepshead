@@ -1,0 +1,251 @@
+<section class="online-table" [class.online-table--busy]="disabled()">
+  <header class="online-table__status">
+    <div>
+      <span>Hand {{ game().hand_number }}</span>
+      <strong>{{ game().is_leaster ? 'Leaster' : game().called_card ? 'Called ' + game().called_card : 'Sheepshead' }}</strong>
+    </div>
+    <button class="table-link" type="button" (click)="openHistory()">History ({{ game().hand_history.length }})</button>
+  </header>
+
+  <div class="online-table__felt">
+    <div class="seat-arc">
+      @for (seat of opponents(); track seat.index; let index = $index) {
+        <article [class]="'online-seat online-seat--opponent-' + index + (game().turn_seat === seat.index ? ' online-seat--turn' : '')">
+          @if (isDealer(seat.index)) {
+            <span class="dealer-chip" title="Dealer" aria-label="Dealer">D</span>
+          }
+          @if (holdsUnder(seat.index)) {
+            <span class="under-marker" title="Holding an under" aria-label="Holding a face-down under"></span>
+          }
+          <div class="online-seat__name">
+            {{ seat.name }}
+            @if (roleLabel(seat.index); as role) {
+              <span class="role-chip">{{ role }}</span>
+            }
+          </div>
+          @if (styleLabel(seat); as style) {
+            <div class="online-seat__style">{{ style }}</div>
+          }
+          <div class="card-backs" [attr.aria-label]="seat.card_count + ' cards'">
+            @for (_ of cardBacks(seat.card_count); track $index) {
+              <span class="card-back"></span>
+            }
+          </div>
+          <div class="online-seat__meta">{{ seat.trick_count }} tricks · {{ game().scores[seat.index] }} pts</div>
+        </article>
+      }
+    </div>
+
+    @if (announcement(); as text) {
+      <!-- Purely informational: pointer-events:none so it can never intercept a card tap,
+           and it clears itself on a timer rather than needing to be dismissed. -->
+      <p class="table-announce" role="status">{{ text }}</p>
+    }
+
+    @if (statusMessage(); as status) {
+      <!-- Status sits above the trick, never on it, so cards stay visible as they land. -->
+      <p class="table-status" role="status">{{ status }}</p>
+    }
+
+    <div class="trick-area" aria-label="Current trick">
+      @for (play of game().current_trick; track play.seat) {
+        @if (play.card === null) {
+          <!-- A face-down under this seat isn't entitled to see. -->
+          <div
+            [class]="'play-card play-card--table play-card--facedown trick-card--seat-' + play.seat"
+            aria-label="Face-down card"
+          >
+            <span class="play-card__facedown-mark">?</span>
+            <span class="play-card__order">{{ $index + 1 }}</span>
+          </div>
+        } @else {
+          <div
+            [class]="'play-card play-card--art play-card--table trick-card--seat-' + play.seat"
+            [style.background-position]="spritePosition(play.card)"
+            [class.play-card--fresh]="animatingCard() === play.seat + ':' + play.card"
+            [class.play-card--winner]="trickWinnerSeat() === play.seat"
+            [class.play-card--under]="play.under"
+            [attr.aria-label]="cardLabel(play.card)"
+          >
+            <span class="play-card__order">{{ $index + 1 }}</span>
+          </div>
+        }
+      }
+    </div>
+
+    @if (showPrompt()) {
+      <div class="table-prompt" [class.table-prompt--board]="awaitingNextHand()" role="group" aria-label="Your decision">
+        @if (awaitingNextHand()) {
+          @if (latestResult(); as result) {
+            <p class="table-prompt__eyebrow">Hand {{ result.hand_number }}</p>
+            <p class="table-prompt__title">{{ resultTitle(result) }}</p>
+            @if (resultDetail(result); as detail) {
+              <p class="table-prompt__hint">{{ detail }}</p>
+            }
+            <table class="scoreboard">
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th scope="col">Pts</th>
+                  <th scope="col">+/−</th>
+                  <th scope="col">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (seat of game().seats; track seat.index) {
+                  <tr [class.scoreboard__row--you]="seat.index === game().seat">
+                    <th scope="row" class="scoreboard__name">
+                      {{ seat.name }}
+                      @if (scoreRole(result, seat.index); as role) {
+                        <span class="scoreboard__role">{{ role }}</span>
+                      }
+                    </th>
+                    <td>{{ result.points[seat.index] }}</td>
+                    <td
+                      class="scoreboard__delta"
+                      [class.scoreboard__delta--up]="result.deltas[seat.index] > 0"
+                      [class.scoreboard__delta--down]="result.deltas[seat.index] < 0"
+                    >{{ result.deltas[seat.index] > 0 ? '+' : '' }}{{ result.deltas[seat.index] }}</td>
+                    <td class="scoreboard__total">{{ game().scores[seat.index] }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="table-prompt__title">Hand complete</p>
+          }
+          <div class="table-prompt__actions">
+            <button class="btn btn-primary" type="button" (click)="nextHand.emit()">Next hand</button>
+          </div>
+        } @else {
+          @switch (game().phase) {
+            @case ('picking') {
+              <p class="table-prompt__title">Will you pick up the blind?</p>
+              <div class="table-prompt__actions">
+                <button class="btn btn-primary" type="button" (click)="emitSimple('pick')">Pick</button>
+                <button class="btn btn-secondary" type="button" (click)="emitSimple('pass')">Pass</button>
+              </div>
+            }
+            @case ('burying') {
+              <p class="table-prompt__title">Bury {{ game().ruleset.blind_size }} cards</p>
+              <p class="table-prompt__hint">
+                Tap cards in your hand · {{ selectedBury().length }} of {{ game().ruleset.blind_size }} chosen
+              </p>
+              <div class="table-prompt__actions">
+                <button
+                  class="btn btn-primary"
+                  type="button"
+                  (click)="confirmBury()"
+                  [disabled]="selectedBury().length !== game().ruleset.blind_size"
+                >Bury cards</button>
+              </div>
+            }
+            @case ('calling') {
+              @if (pendingUnderCall(); as pending) {
+                <p class="table-prompt__title">Calling {{ pending }} under</p>
+                <p class="table-prompt__hint">
+                  Tap a card to place face down. It stands in for {{ pending }}'s suit and can never win a trick.
+                </p>
+                <div class="table-prompt__actions">
+                  <button class="btn btn-primary" type="button" [disabled]="!selectedUnder()" (click)="confirmUnderCall()">Place face down</button>
+                  <button class="btn btn-secondary" type="button" (click)="cancelUnderCall()">Back</button>
+                </div>
+              } @else if (underCallCards().length) {
+                <p class="table-prompt__title">You must call under</p>
+                <p class="table-prompt__hint">You hold no card of any callable suit.</p>
+                <div class="table-prompt__actions">
+                  @for (card of underCallCards(); track card) {
+                    <button class="btn btn-primary" type="button" (click)="startUnderCall(card)">Call {{ card }}</button>
+                  }
+                  <button class="btn btn-secondary" type="button" (click)="call(null)">Go alone</button>
+                  @if (canUnbury()) {
+                    <button class="btn btn-secondary" type="button" (click)="unbury()">Change bury</button>
+                  }
+                </div>
+              } @else if (mustGoAlone()) {
+                <p class="table-prompt__title">You have no Aces to call, go alone?</p>
+                <!-- <p class="table-prompt__hint">
+                  Nothing you kept can reach a partner. Change what you buried to call an ace
+                  instead — there are no restrictions on burying if you go alone.
+                </p> -->
+                <div class="table-prompt__actions">
+                  <button class="btn btn-primary" type="button" (click)="call(null)">Go alone</button>
+                  @if (canUnbury()) {
+                    <button class="btn btn-secondary" type="button" (click)="unbury()">Change bury</button>
+                  }
+                </div>
+              } @else {
+                <p class="table-prompt__title">Call a partner</p>
+                <div class="table-prompt__actions">
+                  @for (choice of callActions(); track choice.card) {
+                    <button class="btn" [class.btn-primary]="choice.card" [class.btn-secondary]="!choice.card" type="button" (click)="call(choice.card)">
+                      {{ choice.card ? 'Call ' + choice.card : 'Go alone' }}
+                    </button>
+                  }
+                  @if (canUnbury()) {
+                    <button class="btn btn-secondary" type="button" (click)="unbury()">Change bury</button>
+                  }
+                </div>
+              }
+            }
+          }
+        }
+      </div>
+    }
+
+    <div class="human-seat" [class.human-seat--turn]="humanTurn()">
+      @if (isDealer(game().seat)) {
+        <span class="dealer-chip" title="Dealer" aria-label="Dealer">D</span>
+      }
+      @if (holdsUnder(game().seat)) {
+        <span class="under-marker" title="Holding an under" aria-label="Holding a face-down under"></span>
+      }
+      <div>
+        <strong>{{ humanSeat().name }}</strong>
+        @if (roleLabel(game().seat); as role) {
+          <span class="role-chip">{{ role }}</span>
+        }
+        <span class="human-seat__score">{{ humanSeat().trick_count }} tricks · {{ game().scores[game().seat] }} pts</span>
+      </div>
+    </div>
+
+    <div class="hand-fan" aria-label="Your hand">
+      @for (card of game().hand; track card) {
+        <button
+          type="button"
+          class="play-card play-card--art play-card--hand"
+          [style.background-position]="spritePosition(card)"
+          [class.play-card--selected]="selectedBury().includes(card) || selectedUnder() === card"
+          [class.play-card--dim]="showPlayableHint() && !playableCards().has(card)"
+          [disabled]="disabled() || !humanTurn() || (game().phase !== 'burying' && !pendingUnderCall() && !playableCards().has(card))"
+          (click)="chooseCard(card)"
+          [attr.aria-label]="'Play the ' + cardLabel(card)"
+        ></button>
+      }
+    </div>
+  </div>
+
+</section>
+
+<dialog #historyDialog class="history-dialog">
+  <header>
+    <h2>Hand history</h2>
+    <button class="btn-close" type="button" (click)="closeHistory()">&times;</button>
+  </header>
+  @if (game().hand_history.length === 0) {
+    <p>No completed hands yet.</p>
+  } @else {
+    <ol>
+      @for (result of game().hand_history; track result.hand_number) {
+        <li>
+          <strong>Hand {{ result.hand_number }} · {{ resultTitle(result) }}</strong>
+          <span>
+            @for (delta of result.deltas; track $index) {
+              {{ game().seats[$index].name }} {{ delta >= 0 ? '+' : '' }}{{ delta }}@if (!$last) { · }
+            }
+          </span>
+        </li>
+      }
+    </ol>
+  }
+</dialog>

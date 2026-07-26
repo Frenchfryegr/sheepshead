@@ -315,3 +315,80 @@ per-game replay loop.
 5. Validate with `python -c "import ast; ast.parse(open('api/main.py', encoding='utf-8').read())"`
    unless asked to run/verify live.
 6. Retiring a stat: remove its def. Since nothing is stored, it simply stops appearing.
+
+## 🃏 Online Play engine
+
+Online play is a server-authoritative, five-handed game against AI opponents. It is completely
+separate from score-tracked `Games`/`Rounds`: online hands never trigger standings recomputation,
+games-list broadcasts, badges, achievements, or statistics.
+
+The pure-Python engine lives in `api/sheepshead/`:
+
+- `cards.py` — card model, 32-card deck, trump/fail ordering, and point values.
+- `rules.py` — the frozen `RuleSet` config and named presets. Deal geometry belongs here.
+- `state.py` — game/hand state, phases, actions, events, and hand results.
+- `engine.py` — `legal_actions(state, seat)` and `apply_action(state, seat, action)`, the two
+  public rules operations. `create_game()` only creates/deals the initial state.
+- `scoring.py` — trick winner and tracked-score-compatible point deltas.
+- `serialization.py` — full snapshot round-trip and the anti-cheat `seat_view()`.
+- `ai.py` — pluggable strategy protocol and registry.
+- `simulate.py` — random soak; `run()` returns a summary, `main()` is the CLI wrapper.
+- `test_engine.py` / `test_ai_knowledge.py` / `test_simulate.py` — focused invariant/parity tests,
+  the knowledge-derivation truth tables, and a short in-suite soak.
+
+`legal_actions()` is the single source of truth. The frontend renders only actions returned by
+the API, the API validates with it, and AI chooses from it. Do not duplicate a rule in any of
+those consumers.
+
+### Redaction and persistence invariants
+
+- `seat_view()` is the only engine-state shape allowed to leave the backend. Never serialize a
+  `GameState` or hand-built subset from `main.py`; new state fields remain hidden until explicitly
+  added to `seat_view()`.
+- `OnlineGames.state` is the authoritative full snapshot, including hidden cards.
+  `OnlineGameActions` is an append-only debug/replay log; if it disagrees with the snapshot, the
+  snapshot wins.
+- Every mutation carries `version`. Persist with an update constrained by both
+  `online_game_id` and the old `version`, then increment it. Zero updated rows means HTTP 409 and
+  the client refetches.
+- Ownership is checked on every endpoint with `Depends(get_current_user_id)` and
+  `owner_user_id`; return 404 for missing or foreign games.
+- Resolve the human action and all following AI turns, then persist one snapshot/version update
+  per request.
+
+Validate Python source without starting servers:
+
+`python -c "import ast, pathlib; [ast.parse(p.read_text(encoding='utf-8')) for p in pathlib.Path('api').rglob('*.py')]"`
+
+Run engine checks from `api/` (the API is a uv project — run them through uv so the locked
+environment is used):
+
+`uv run pytest -q` — the whole suite, including a short 300-hand soak.
+
+`uv run python -m sheepshead.simulate 3000` — the long soak, on demand.
+
+`uv run python -m sheepshead.simulate 2000 --strategy heuristic` — AI calibration. Reports the
+leaster rate (target 10-15%) and pick rate per seat position; this is how the bidding thresholds in
+`ai_heuristic.py` get tuned.
+
+`pytest` lives in the `dev` dependency group and is excluded from the image by the Dockerfile's
+`uv sync --no-dev`. Tests are plain `unittest.TestCase`, so
+`uv run python -m unittest discover -t . -s sheepshead -p "test_*.py" -v` also works. The `-t .` is
+required — without it `discover` treats `sheepshead/` as the root and every relative import fails.
+
+## 🤖 Adding an AI difficulty
+
+1. Add one class in `api/sheepshead/ai.py` implementing
+   `choose(view, legal, rng)`. The view is the same redacted seat view a human gets.
+2. Add one entry to `AI_STRATEGIES`.
+3. Add the registry name to the frontend difficulty options.
+4. Nothing else. A difficulty must not require engine, endpoint, schema, or serialization edits.
+
+## ♠ Adding a rule variant
+
+1. Extend `RuleSet` and add a named preset; deal geometry must remain config-driven.
+2. Branch on `ruleset.partner_method` or other config in `engine.legal_actions()`/hand setup and
+   `scoring.py`. For example, three-handed leaster scores `+2/-1`; jack-of-diamonds partner skips
+   the calling phase.
+3. Accept the preset at online-game creation and add a frontend option.
+4. Do not change the schema (`ruleset` is JSON), serialization contract, or AI interface.

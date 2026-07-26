@@ -14,9 +14,11 @@ import { Profile } from './profile/profile';
 import { Badges } from './badges/badges';
 import { Achievements } from './achievements/achievements';
 import { Statistics } from './statistics/statistics';
+import { Play } from './play/play/play';
+import { PlayTable } from './play/play-table/play-table';
 
 @NgModule({
-  declarations: [App, Games, TableView, AccountBar, Profile, Badges, Achievements, Statistics],
+  declarations: [App, Games, TableView, AccountBar, Profile, Badges, Achievements, Statistics, Play, PlayTable],
   imports: [BrowserModule, AppRoutingModule, FormsModule, HttpClientModule],
   providers: [
     provideBrowserGlobalErrorListeners(),

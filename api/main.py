@@ -1,6 +1,8 @@
 import os
 import re
 import logging
+import random
+import secrets
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
@@ -14,6 +16,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
 
+from sheepshead.ai import AI_STRATEGIES, DEFAULT_AI
+from sheepshead.ai_style import PLAYSTYLE_KEYS, STYLES
+from sheepshead.engine import (
+    IllegalActionError,
+    apply_action,
+    create_game as create_online_game_state,
+    legal_actions,
+)
+from sheepshead.rules import RULESET_PRESETS
+from sheepshead.serialization import (
+    action_from_dict,
+    action_to_dict,
+    full_state_from_dict,
+    full_state_to_dict,
+    seat_view,
+)
+from sheepshead.state import Event, GameState, Seat
+
 class TABLE_NAMES(Enum):
     GAMES = "Games"
     PLAYERS = "Players"
@@ -23,6 +43,8 @@ class TABLE_NAMES(Enum):
     ACCOUNTS = "Accounts"
     BADGES = "Badges"
     PLAYER_ACHIEVEMENTS = "PlayerAchievements"
+    ONLINE_GAMES = "OnlineGames"
+    ONLINE_GAME_ACTIONS = "OnlineGameActions"
 
 class ROUND_RESULTS(Enum):
     PICKER_WIN = "Picker Win"
@@ -1732,3 +1754,308 @@ def logout(authorization: str = Header(None), user_id: str = Depends(get_current
 @app.get("/auth/me", tags=["Auth"])
 def get_me(user_id: str = Depends(get_current_user_id)):
     return serialize_profile(load_profile(user_id))
+
+
+# ---- Online Play ----
+
+ONLINE_AI_NAMES = ("Amber", "Benny", "Clara", "Duke")
+ONLINE_AI_LOOP_LIMIT = 200
+
+
+def _online_human_seat(state: GameState) -> int:
+    humans = [seat.index for seat in state.seats if seat.is_human]
+    if len(humans) != 1:
+        raise HTTPException(status_code=500, detail="Online game has an invalid human seat")
+    return humans[0]
+
+
+def _online_game_row(online_game_id: int, user_id: str) -> dict:
+    response = (
+        supabase.table(TABLE_NAMES.ONLINE_GAMES.value)
+        .select("*")
+        .eq("online_game_id", online_game_id)
+        .eq("owner_user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Online game not found")
+    return response.data[0]
+
+
+def _online_action_count(online_game_id: int) -> int:
+    response = (
+        supabase.table(TABLE_NAMES.ONLINE_GAME_ACTIONS.value)
+        .select("seq")
+        .eq("online_game_id", online_game_id)
+        .order("seq", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return int(response.data[0]["seq"]) if response.data else 0
+
+
+def _drive_online_ai(
+    state: GameState, starting_seq: int
+) -> tuple[GameState, list[Event], list[tuple[int, int, dict]]]:
+    events: list[Event] = []
+    action_rows: list[tuple[int, int, dict]] = []
+    seq = starting_seq
+    for _ in range(ONLINE_AI_LOOP_LIMIT):
+        turn = state.hand.turn_seat
+        if turn is None or state.seats[turn].is_human:
+            return state, events, action_rows
+        strategy_name = state.seats[turn].ai_strategy or DEFAULT_AI
+        strategy_factory = AI_STRATEGIES.get(strategy_name)
+        if strategy_factory is None:
+            raise HTTPException(status_code=500, detail=f"Unknown stored AI strategy: {strategy_name}")
+        legal = legal_actions(state, turn)
+        if not legal:
+            raise HTTPException(status_code=500, detail="AI turn has no legal action")
+        rng = random.Random(state.rng_seed + seq + 1)
+        action = strategy_factory().choose(seat_view(state, turn), legal, rng)
+        state, action_events = apply_action(state, turn, action)
+        seq += 1
+        action_rows.append((seq, turn, action_to_dict(action)))
+        events.extend(action_events)
+    raise HTTPException(status_code=500, detail="AI action loop exceeded its safety limit")
+
+
+def _online_view(row: dict, state: GameState, events: list[Event] | None = None) -> dict:
+    view = seat_view(
+        state,
+        _online_human_seat(state),
+        version=int(row["version"]),
+        events=events or [],
+    )
+    return {
+        "online_game_id": int(row["online_game_id"]),
+        "status": row["status"],
+        **view,
+    }
+
+
+def _insert_online_action_rows(
+    online_game_id: int, rows: list[tuple[int, int, dict]]
+) -> None:
+    if not rows:
+        return
+    supabase.table(TABLE_NAMES.ONLINE_GAME_ACTIONS.value).insert(
+        [
+            {
+                "online_game_id": online_game_id,
+                "seq": seq,
+                "seat": seat,
+                "action": action,
+            }
+            for seq, seat, action in rows
+        ]
+    ).execute()
+
+
+@app.post("/online-games", tags=["Online Play"])
+def create_online_game(
+    ruleset_preset: str = Body("five_handed_called_ace"),
+    ai_strategies: str | list[str] | None = Body(None),
+    seat_names: list[str] | None = Body(None),
+    user_id: str = Depends(get_current_user_id),
+):
+    ruleset = RULESET_PRESETS.get(ruleset_preset)
+    if ruleset is None:
+        raise HTTPException(status_code=422, detail="Unknown ruleset preset")
+
+    if ai_strategies is None:
+        # No choice made: deal out playstyles at random. Repeats are allowed — two Gamblers at
+        # one table is a legitimate draw, not a collision to avoid.
+        strategy_names = [
+            secrets.choice(PLAYSTYLE_KEYS) for _ in range(ruleset.num_players - 1)
+        ]
+    elif isinstance(ai_strategies, str):
+        strategy_names = [ai_strategies] * (ruleset.num_players - 1)
+    else:
+        strategy_names = list(ai_strategies)
+        if len(strategy_names) == ruleset.num_players:
+            strategy_names = strategy_names[1:]
+    if len(strategy_names) != ruleset.num_players - 1:
+        raise HTTPException(status_code=422, detail="Provide one AI strategy or one per AI seat")
+    unknown = [name for name in strategy_names if name not in AI_STRATEGIES]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown AI strategy: {unknown[0]}")
+
+    if seat_names is not None and len(seat_names) != ruleset.num_players:
+        raise HTTPException(status_code=422, detail="seat_names must match the ruleset seat count")
+    names = seat_names or ["You", *ONLINE_AI_NAMES[: ruleset.num_players - 1]]
+    names = [str(name).strip()[:32] for name in names]
+    if any(not name for name in names):
+        raise HTTPException(status_code=422, detail="Seat names cannot be blank")
+
+    seats = [Seat(0, names[0], True, None)] + [
+        Seat(index, names[index], False, strategy_names[index - 1])
+        for index in range(1, ruleset.num_players)
+    ]
+    state = create_online_game_state(ruleset, seats, secrets.randbits(63))
+    state, events, action_rows = _drive_online_ai(state, 0)
+    response = (
+        supabase.table(TABLE_NAMES.ONLINE_GAMES.value)
+        .insert(
+            {
+                "owner_user_id": user_id,
+                "ruleset": ruleset.to_dict(),
+                "seats": [
+                    {
+                        "index": seat.index,
+                        "name": seat.name,
+                        "is_human": seat.is_human,
+                        "ai_strategy": seat.ai_strategy,
+                    }
+                    for seat in seats
+                ],
+                "state": full_state_to_dict(state),
+                "scores": state.scores,
+                "hand_number": state.hand.hand_number,
+            }
+        )
+        .execute()
+    )
+    row = response.data[0]
+    _insert_online_action_rows(int(row["online_game_id"]), action_rows)
+    return _online_view(row, state, events)
+
+
+@app.get("/online-games", tags=["Online Play"])
+def list_online_games(user_id: str = Depends(get_current_user_id)):
+    response = (
+        supabase.table(TABLE_NAMES.ONLINE_GAMES.value)
+        .select("online_game_id,status,hand_number,scores,seats,version,created,updated_at")
+        .eq("owner_user_id", user_id)
+        .order("updated_at", desc=True)
+        .execute()
+    )
+    return response.data
+
+
+# Declared before /online-games/{online_game_id}: FastAPI matches in order, and an int path
+# parameter would reject "playstyles" with a 422 rather than falling through to this route.
+@app.get("/online-games/playstyles", tags=["Online Play"])
+def list_playstyles():
+    """The AI personalities a game can be created with. All play at the same strength."""
+    return [
+        {"key": key, "name": style.name, "description": style.description}
+        for key, style in STYLES.items()
+    ]
+
+
+@app.get("/online-games/{online_game_id}", tags=["Online Play"])
+def get_online_game(online_game_id: int, user_id: str = Depends(get_current_user_id)):
+    row = _online_game_row(online_game_id, user_id)
+    return _online_view(row, full_state_from_dict(row["state"]))
+
+
+@app.post("/online-games/{online_game_id}/actions", tags=["Online Play"])
+def submit_online_action(
+    online_game_id: int,
+    version: int = Body(...),
+    action: dict = Body(...),
+    user_id: str = Depends(get_current_user_id),
+):
+    row = _online_game_row(online_game_id, user_id)
+    if row["status"] != "in_progress":
+        raise HTTPException(status_code=409, detail="Online game is not in progress")
+    if int(row["version"]) != version:
+        raise HTTPException(status_code=409, detail="Online game changed; refresh and try again")
+
+    state = full_state_from_dict(row["state"])
+    human_seat = _online_human_seat(state)
+    try:
+        parsed_action = action_from_dict(action)
+        state, events = apply_action(state, human_seat, parsed_action)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    starting_seq = _online_action_count(online_game_id)
+    action_rows = [(starting_seq + 1, human_seat, action_to_dict(parsed_action))]
+    state, ai_events, ai_rows = _drive_online_ai(state, starting_seq + 1)
+    events.extend(ai_events)
+    action_rows.extend(ai_rows)
+    now = datetime.now(timezone.utc).isoformat()
+    update = (
+        supabase.table(TABLE_NAMES.ONLINE_GAMES.value)
+        .update(
+            {
+                "state": full_state_to_dict(state),
+                "scores": state.scores,
+                "hand_number": state.hand.hand_number,
+                "version": version + 1,
+                "updated_at": now,
+            }
+        )
+        .eq("online_game_id", online_game_id)
+        .eq("owner_user_id", user_id)
+        .eq("version", version)
+        .execute()
+    )
+    if not update.data:
+        raise HTTPException(status_code=409, detail="Online game changed; refresh and try again")
+    _insert_online_action_rows(online_game_id, action_rows)
+    return _online_view(update.data[0], state, events)
+
+
+@app.delete("/online-games/{online_game_id}", tags=["Online Play"])
+def delete_online_game(
+    online_game_id: int,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Permanently remove a finished game. `OnlineGameActions` cascades with it.
+
+    In-progress games must be abandoned first. That is not squeamishness — it keeps the
+    irreversible step separate from the one that ends a game, so a live table cannot be
+    discarded by a single mis-tap.
+    """
+    row = _online_game_row(online_game_id, user_id)
+    if row["status"] == "in_progress":
+        raise HTTPException(status_code=409, detail="Abandon the game before deleting it")
+    # The owner filter is repeated on the delete itself rather than relying on the lookup
+    # above: this is the statement that destroys data, so it carries its own guard.
+    (
+        supabase.table(TABLE_NAMES.ONLINE_GAMES.value)
+        .delete()
+        .eq("online_game_id", online_game_id)
+        .eq("owner_user_id", user_id)
+        .execute()
+    )
+    return {"online_game_id": online_game_id, "deleted": True}
+
+
+@app.post("/online-games/{online_game_id}/abandon", tags=["Online Play"])
+def abandon_online_game(
+    online_game_id: int,
+    version: int = Body(..., embed=True),
+    user_id: str = Depends(get_current_user_id),
+):
+    row = _online_game_row(online_game_id, user_id)
+    if row["status"] != "in_progress":
+        raise HTTPException(status_code=409, detail="Online game is not in progress")
+    update = (
+        supabase.table(TABLE_NAMES.ONLINE_GAMES.value)
+        .update(
+            {
+                "status": "abandoned",
+                "version": version + 1,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        .eq("online_game_id", online_game_id)
+        .eq("owner_user_id", user_id)
+        .eq("version", version)
+        .execute()
+    )
+    if not update.data:
+        raise HTTPException(status_code=409, detail="Online game changed; refresh and try again")
+    closed = update.data[0]
+    return {
+        "online_game_id": int(closed["online_game_id"]),
+        "status": closed["status"],
+        "scores": closed["scores"],
+        "hand_number": closed["hand_number"],
+        "version": closed["version"],
+    }

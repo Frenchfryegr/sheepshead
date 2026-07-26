@@ -10,3 +10,15 @@ dependencies = [
     "python-multipart>=0.0.32",
     "supabase>=2.31.0",
 ]
+
+[dependency-groups]
+# Test-only; the Dockerfile syncs with --no-dev so none of this ships to production.
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+# rootdir is api/, so the engine tests import as sheepshead.test_* and their relative
+# imports resolve. This is what `unittest discover` needs an explicit `-t .` for.
+testpaths = ["sheepshead"]
+python_files = ["test_*.py"]
