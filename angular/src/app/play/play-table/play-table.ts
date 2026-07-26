@@ -72,6 +72,23 @@ export class PlayTable {
   })
 
   /**
+   * The terse contract, for the header strip. Same facts as `contractText`, which narrates them
+   * once in a banner; this one persists all hand, so it names the deal rather than the player.
+   *
+   * Gated on the phase for the same reason: during `calling` a null `called_card` means "not
+   * called yet", which is indistinguishable from going alone.
+   */
+  contractLabel = computed(() => {
+    const game = this.game()
+    if (game.is_leaster) return 'Leaster'
+    if (!['playing', 'hand_done', 'game_over'].includes(game.phase)) return 'Sheepshead'
+    if (game.picker_seat === null) return 'Sheepshead'
+    if (!game.called_card) return 'Picker Went Alone'
+    const parts = this.cardParts(game.called_card)
+    return `Called ${parts.rank}${parts.suit}${game.under_declared ? ' w/ Under' : ''}`
+  })
+
+  /**
    * Whether the picker is still holding a face-down under. Everyone may know this — they all
    * watched the card go down — so it is derived from public data only: the declaration flag,
    * and whether a play carrying `under: true` has appeared in any trick yet.

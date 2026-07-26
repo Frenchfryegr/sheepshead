@@ -3,6 +3,12 @@ from .rules import RuleSet
 from .state import HandResult, HandState
 
 
+# Reaching 30 *is* schneider — the team is safe there and the stake stays at 1x. Only a team
+# held to 29 or fewer pays double. Mirrored on the winning side: 91 is the least that holds the
+# opposition under 30 (120 - 91 = 29), so the no-schneider line needs no separate constant.
+SCHNEIDER_LINE = 30
+
+
 def trick_winner(
     trick: list[tuple[int, object]],
     ruleset: RuleSet,
@@ -96,7 +102,7 @@ def score_hand(hand: HandState, ruleset: RuleSet) -> HandResult:
     )
     if winners_took_every_trick:
         multiplier = 3
-    elif losing_points < 31:
+    elif losing_points < SCHNEIDER_LINE:
         multiplier = 2
     else:
         multiplier = 1

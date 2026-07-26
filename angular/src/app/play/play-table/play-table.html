@@ -2,7 +2,7 @@
   <header class="online-table__status">
     <div>
       <span>Hand {{ game().hand_number }}</span>
-      <strong>{{ game().is_leaster ? 'Leaster' : game().called_card ? 'Called ' + game().called_card : 'Sheepshead' }}</strong>
+      <strong>{{ contractLabel() }}</strong>
     </div>
     <button class="table-link" type="button" (click)="openHistory()">History ({{ game().hand_history.length }})</button>
   </header>

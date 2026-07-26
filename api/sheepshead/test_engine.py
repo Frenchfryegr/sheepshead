@@ -176,6 +176,26 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(4, leaster.deltas[leaster.leaster_winner])
         self.assertEqual(0, sum(leaster.deltas))
 
+    def test_thirty_points_is_schneider_and_pays_single(self) -> None:
+        """Reaching 30 is safe. The doubling line is 30, not 31 — an off-by-one either way
+        silently changes what every close hand pays, so both sides of it are pinned."""
+        rules = RuleSet()
+        # 31 and 89 are skipped: the fixture builds totals greedily and cannot hit them.
+        for losing, expected in ((28, 2), (29, 2), (30, 1), (32, 1)):
+            with self.subTest(picker_loses_with=losing):
+                # The picker falls short, so their own total is the losing side's.
+                result = score_hand(_scoring_hand(team_points=losing), rules)
+                self.assertEqual("picker_loss", result.kind)
+                self.assertEqual(expected, result.multiplier)
+                self.assertEqual(expected >= 2, result.no_schneider)
+
+        for team, expected in ((88, 1), (90, 1), (91, 2), (92, 2)):
+            with self.subTest(picker_wins_with=team):
+                # Mirrored: 91 is the least that holds the opposition to 29.
+                result = score_hand(_scoring_hand(team_points=team), rules)
+                self.assertEqual("picker_win", result.kind)
+                self.assertEqual(expected, result.multiplier)
+
     def test_called_ace_constraints_are_legal_action_rules(self) -> None:
         rules = RuleSet()
         state = create_game(rules, _seats(), 999)
