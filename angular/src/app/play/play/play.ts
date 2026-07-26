@@ -2,7 +2,7 @@ import { isPlatformBrowser } from '@angular/common'
 import { Component, inject, OnDestroy, OnInit, PLATFORM_ID, signal } from '@angular/core'
 import { HttpErrorResponse } from '@angular/common/http'
 
-import { OnlineAction, OnlineEvent, OnlineGameSummary, OnlineGameView, OnlineHandResult, OnlinePlaystyle } from '../../interfaces/online-game'
+import { OnlineAction, OnlineCard, OnlineEvent, OnlineGameSummary, OnlineGameView, OnlineHandResult, OnlinePlaystyle } from '../../interfaces/online-game'
 import { TableDisplay } from '../../games/table-display'
 import { OnlineGameService } from '../online-game-service'
 
@@ -133,10 +133,17 @@ export class Play implements OnInit, OnDestroy {
     if (!game || this.submitting()) return
     this.submitting.set(true)
     this.error.set(null)
+    // Put the card on the table now rather than after the round trip. The player has already
+    // committed, the move is legal (they could only click a legal card), and the server cannot
+    // disagree about what they played — so the wait was showing them nothing they did not know.
+    const beforeEcho = action.type === 'play' ? this.cloneView(game) : null
+    if (action.type === 'play') this.echoPlay(game, action.card)
     this.service.sendAction(game.online_game_id, game.version, action).subscribe({
       next: response => void this.presentResponse(response),
       error: error => {
         this.submitting.set(false)
+        // The card was never played, so take it back before saying anything about the failure.
+        if (beforeEcho) this.activeGame.set(beforeEcho)
         if (error instanceof HttpErrorResponse && error.status === 409) {
           this.reloadActiveGame(game.online_game_id)
         } else {
@@ -144,6 +151,31 @@ export class Play implements OnInit, OnDestroy {
         }
       },
     })
+  }
+
+  /**
+   * Show a card as played before the server confirms it.
+   *
+   * Deliberately does not touch `trick_winning_seat`: deciding whether this card now leads
+   * needs the trump hierarchy and the under rule, which are engine business. The badge catches
+   * up when the response lands, a few hundred milliseconds later.
+   */
+  private echoPlay(game: OnlineGameView, card: OnlineCard): void {
+    const next = this.cloneView(game)
+    next.current_trick.push({
+      seat: next.seat,
+      card,
+      under: game.under_card === card ? true : undefined,
+    })
+    next.hand = next.hand.filter(held => held !== card)
+    const me = next.seats[next.seat]
+    if (me) me.card_count = Math.max(0, me.card_count - 1)
+    next.turn_seat = (next.seat + 1) % next.ruleset.num_players
+    next.legal_actions = []  // nothing is playable until the server says so
+    this.activeGame.set(next)
+    // Deal it in with the same arrival animation the AI's cards get. Playback will replay this
+    // card a moment later and deliberately leaves the flag alone, so it is never cut short.
+    this.animatingCard.set(`${next.seat}:${card}`)
   }
 
   askDelete(game: OnlineGameSummary): void {
@@ -248,16 +280,25 @@ export class Play implements OnInit, OnDestroy {
     for (const event of response.events) {
       // Superseded: closeTable cancelled us and has already reset the shared state.
       if (run !== this.playbackRun) return
-      this.playbackMessage.set(this.describeEvent(event, response))
       const current = this.activeGame()
+      // The player's own card was echoed on click, so it is already sitting on the table. Do
+      // not deal it a second time, and do not spend a beat narrating what they watched happen.
+      const echoed = event.type === 'card_played'
+        && event.seat !== undefined
+        && !!current?.current_trick.some(play => play.seat === event.seat)
+      this.playbackMessage.set(echoed ? null : this.describeEvent(event, response))
       if (current) {
         this.activeGame.set(this.applyPlaybackEvent(current, event, response))
       }
-      this.animatingCard.set(
-        event.type === 'card_played' && event.seat !== undefined && event.card
-          ? `${event.seat}:${event.card}`
-          : null,
-      )
+      // An echoed card is already mid-animation from the click; clearing the flag here would
+      // truncate it on a fast response. The next event replaces it in the normal way.
+      if (!echoed) {
+        this.animatingCard.set(
+          event.type === 'card_played' && event.seat !== undefined && event.card
+            ? `${event.seat}:${event.card}`
+            : null,
+        )
+      }
       this.trickWinnerSeat.set(
         event.type === 'trick_won' && event.seat !== undefined ? event.seat : null,
       )
@@ -268,13 +309,16 @@ export class Play implements OnInit, OnDestroy {
           this.nextHandResolve = resolve
         })
       }
-      const delay = reducedMotion ? 80 : this.playbackDelay(event)
+      // An echoed card costs no time: it landed when they clicked it, and pausing here would
+      // put the round trip back in front of the AI responses.
+      const delay = echoed ? 0 : reducedMotion ? 80 : this.playbackDelay(event)
       await new Promise(resolve => setTimeout(resolve, delay))
       if (event.type === 'trick_won') {
         const displayed = this.activeGame()
         if (displayed) {
           const swept = this.cloneView(displayed)
           swept.current_trick = []
+          swept.trick_winning_seat = null
           this.activeGame.set(swept)
         }
         this.trickWinnerSeat.set(null)
@@ -301,24 +345,31 @@ export class Play implements OnInit, OnDestroy {
     const next = this.cloneView(view)
     next.events = []
     switch (event.type) {
-      case 'card_played':
+      case 'card_played': {
         // A masked under arrives with no card but must still animate into the trick.
         if (event.seat === undefined || (!event.card && !event.under)) break
-        if (!next.current_trick.some(play => play.seat === event.seat)) {
+        // The player's own card is already on the table — echoed on click, before the request
+        // went out. Re-applying its side effects would take a second card off their count.
+        const alreadyShown = next.current_trick.some(play => play.seat === event.seat)
+        if (!alreadyShown) {
           next.current_trick.push({
             seat: event.seat,
             card: event.card ?? null,
             under: event.under,
           })
-        }
-        if (event.seat === next.seat) {
-          next.hand = next.hand.filter(card => card !== event.card)
-        }
-        if (next.seats[event.seat]) {
-          next.seats[event.seat].card_count = Math.max(0, next.seats[event.seat].card_count - 1)
+          if (event.seat === next.seat) {
+            next.hand = next.hand.filter(card => card !== event.card)
+          }
+          if (next.seats[event.seat]) {
+            next.seats[event.seat].card_count = Math.max(0, next.seats[event.seat].card_count - 1)
+          }
         }
         next.turn_seat = (event.seat + 1) % next.ruleset.num_players
+        // The engine recomputes the leader after every card, so the badge follows it live
+        // rather than only landing when the trick closes.
+        next.trick_winning_seat = event.winning_seat ?? null
         break
+      }
       case 'trick_won':
         if (event.seat !== undefined && next.seats[event.seat]) {
           next.seats[event.seat].trick_count += 1
@@ -410,6 +461,7 @@ export class Play implements OnInit, OnDestroy {
     view.partner_seat = null
     view.is_leaster = false
     view.current_trick = []
+    view.trick_winning_seat = null
     view.completed_tricks = []
     view.turn_seat = (view.dealer_seat + 1) % view.ruleset.num_players
     for (const seat of view.seats) {

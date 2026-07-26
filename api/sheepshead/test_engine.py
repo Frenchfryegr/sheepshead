@@ -355,6 +355,27 @@ class EngineTests(unittest.TestCase):
         # The rest of the hand still decodes, including the winner list it cannot rebuild.
         self.assertEqual(state.hand.trick_winners, decoded.hand.trick_winners)
 
+    def test_the_running_trick_leader_is_reported_and_moves(self) -> None:
+        state = self._leaster_in_play(2468)
+        self.assertIsNone(seat_view(state, 0)["trick_winning_seat"], "no trick open yet")
+
+        leaders = []
+        for _ in range(5):
+            turn = state.hand.turn_seat
+            play = next(a for a in legal_actions(state, turn) if a.type == "play")
+            state, events = apply_action(state, turn, play)
+            played = next(event for event in events if event.type == "card_played")
+            leaders.append(played.winning_seat)
+
+        # Every card reports who is taking the trick at that moment, and the first card always
+        # leads its own trick.
+        self.assertEqual(leaders[0], state.hand.completed_tricks[0][0][0])
+        self.assertTrue(all(seat is not None for seat in leaders))
+        # The last report must agree with who actually took it.
+        self.assertEqual(state.hand.trick_winners[0], leaders[-1])
+        # Swept, so nobody is taking anything until the next card falls.
+        self.assertIsNone(seat_view(state, 0)["trick_winning_seat"])
+
     def test_seat_view_exposes_public_trick_history_and_points(self) -> None:
         state = self._leaster_in_play(8642)
         state = self._play_one_trick(state)

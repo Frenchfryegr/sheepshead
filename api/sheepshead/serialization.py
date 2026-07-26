@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from .cards import Card, card_points, sort_key
-from .engine import legal_actions
+from .engine import _running_winner, legal_actions
 from .rules import RuleSet
 from .state import (
     Action,
@@ -80,6 +80,8 @@ def event_to_dict(event: Event) -> dict:
         data["points"] = event.points
     if event.hand_number is not None:
         data["hand_number"] = event.hand_number
+    if event.winning_seat is not None:
+        data["winning_seat"] = event.winning_seat
     if event.result is not None:
         data["result"] = result_to_dict(event.result)
     return data
@@ -282,6 +284,9 @@ def seat_view(
         # ...but the *fact* of an under is public: everyone watched the card go down. Whether it
         # has since been played is derivable from the `under` flag on the trick entries.
         "under_declared": hand.under_card is not None,
+        # Who is taking the open trick. Public, and derived here rather than in Angular so the
+        # trick ordering — including the under's inability to win — stays in one place.
+        "trick_winning_seat": _running_winner(state),
         "current_trick": [
             _play_json(hand, trick_seat, card, may_see_under)
             for trick_seat, card in hand.current_trick

@@ -56,7 +56,9 @@
             aria-label="Face-down card"
           >
             <span class="play-card__facedown-mark">?</span>
-            <span class="play-card__order">{{ $index + 1 }}</span>
+            @if (game().trick_winning_seat === play.seat) {
+              <span class="play-card__leading" aria-label="Currently taking the trick"></span>
+            }
           </div>
         } @else {
           <div
@@ -67,7 +69,9 @@
             [class.play-card--under]="play.under"
             [attr.aria-label]="cardLabel(play.card)"
           >
-            <span class="play-card__order">{{ $index + 1 }}</span>
+            @if (game().trick_winning_seat === play.seat) {
+              <span class="play-card__leading" aria-label="Currently taking the trick"></span>
+            }
           </div>
         }
       }

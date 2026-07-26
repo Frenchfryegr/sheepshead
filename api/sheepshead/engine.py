@@ -142,6 +142,21 @@ def _follow_suit(state: GameState, seat: int, card: Card) -> str:
     return effective_suit(card, state.ruleset)
 
 
+def _running_winner(state: GameState) -> int | None:
+    """Seat currently taking the open trick, or None if only the under has fallen.
+
+    The under is excluded because it can never win, which is also why this cannot simply be the
+    highest card played so far.
+    """
+    hand = state.hand
+    if not hand.current_trick:
+        return None
+    contenders = [(seat, card) for seat, card in hand.current_trick if card != hand.under_card]
+    if not contenders:
+        return None
+    return trick_winner(contenders, state.ruleset, led_suit=_led_suit(state))
+
+
 def _other_hands(hand_state: HandState, seat: int) -> list[list[Card]]:
     """Hands other than `seat`'s. Buried cards are in neither, which is what makes a buried
     ace correctly uncallable."""
@@ -394,7 +409,14 @@ def apply_action(state: GameState, seat: int, action: Action) -> tuple[GameState
     elif isinstance(action, PlayAction):
         hand.hands[seat].remove(action.card)
         hand.current_trick.append((seat, action.card))
-        events.append(Event("card_played", seat=seat, card=action.card))
+        events.append(
+            Event(
+                "card_played",
+                seat=seat,
+                card=action.card,
+                winning_seat=_running_winner(next_state),
+            )
+        )
         if (
             len(hand.current_trick) == 1
             and hand.called_card is not None
