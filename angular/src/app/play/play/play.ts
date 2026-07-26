@@ -198,7 +198,7 @@ export class Play implements OnInit, OnDestroy {
     // all played, i.e. until an AI picked or the turn reached the player. Seed the deal first so
     // the hand is visible while the bidding is narrated.
     if (!this.activeGame()) {
-      this.activeGame.set(this.openingView(response))
+      this.activeGame.set(this.freshDealView(response))
       this.enableTableDisplay()
     }
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -207,7 +207,7 @@ export class Play implements OnInit, OnDestroy {
       this.playbackMessage.set(this.describeEvent(event, response))
       const current = this.activeGame()
       if (current) {
-        this.activeGame.set(this.applyPlaybackEvent(current, event))
+        this.activeGame.set(this.applyPlaybackEvent(current, event, response))
       }
       this.animatingCard.set(
         event.type === 'card_played' && event.seat !== undefined && event.card
@@ -245,7 +245,15 @@ export class Play implements OnInit, OnDestroy {
     this.submitting.set(false)
   }
 
-  private applyPlaybackEvent(view: OnlineGameView, event: OnlineEvent): OnlineGameView {
+  private applyPlaybackEvent(
+    view: OnlineGameView,
+    event: OnlineEvent,
+    response: OnlineGameView,
+  ): OnlineGameView {
+    // A new deal cannot be derived from the hand that just ended — the player's cards are
+    // all gone by then. Rebuild it from the response, which carries the fresh hand.
+    if (event.type === 'new_hand') return this.freshDealView(response)
+
     const next = this.cloneView(view)
     next.events = []
     switch (event.type) {
@@ -272,6 +280,11 @@ export class Play implements OnInit, OnDestroy {
           next.seats[event.seat].trick_count += 1
           next.turn_seat = event.seat
         }
+        // The displayed legal actions belong to the trick that just ended, and go stale the
+        // moment a new one starts. The response's are for the trick about to be led, and are
+        // valid from its first card: what a player may follow with depends on the led suit,
+        // not on how many have played after it.
+        next.legal_actions = response.legal_actions
         break
       case 'passed':
         if (event.seat === undefined) break
@@ -279,6 +292,12 @@ export class Play implements OnInit, OnDestroy {
         // Move the turn marker along with the bidding. Only card_played used to do this, which
         // was invisible while the table did not render until the bidding was over.
         next.turn_seat = (event.seat + 1) % next.ruleset.num_players
+        if (next.passes.length === next.ruleset.num_players) {
+          // Everyone passed: the contract is settled as a leaster. There is no event of its
+          // own for this, so the last pass is what establishes it.
+          next.is_leaster = true
+          next.phase = 'playing'
+        }
         break
       case 'picked':
         if (event.seat === undefined) break
@@ -287,6 +306,11 @@ export class Play implements OnInit, OnDestroy {
         break
       case 'called':
         next.called_card = event.card ?? null
+        // Advancing the phase here is what lets the contract announcement fire at the right
+        // moment in the narration rather than after the whole drive loop. `contractText()`
+        // stays null until `playing` because a null called_card during `calling` means "not
+        // called yet", which is indistinguishable from going alone.
+        next.phase = 'playing'
         break
       case 'partner_revealed':
         if (event.seat !== undefined) {
@@ -313,17 +337,21 @@ export class Play implements OnInit, OnDestroy {
   }
 
   /**
-   * The state a freshly dealt hand starts from, rewound out of a create response.
+   * The state a freshly dealt hand starts from, rewound out of a response.
+   *
+   * Used at both points where a deal appears with nothing to advance from: creating a game
+   * (no view on screen at all) and the `new_hand` event mid-playback (the previous hand's view
+   * is useless — the player's cards are all gone by then, which is why their hand showed as
+   * empty for the whole of the next hand's bidding).
    *
    * The response already reflects every AI action the drive loop took, so showing it directly
    * would spoil the bidding the playback is about to narrate — the picker, the called card, and
-   * any cards already on the table. This is an exact reconstruction rather than a guess: a new
-   * game always begins with the full deal, nobody passed, and the turn on the dealer's left.
-   *
-   * Only reachable from game creation. `sendAction` always has a view on screen already, and
-   * `resume` sets one without playback.
+   * any cards already on the table. This is an exact reconstruction rather than a guess: a deal
+   * always begins with full hands, nobody passed, and the turn on the dealer's left. The
+   * player's own cards need no rewind either way, because a response contains at most one human
+   * action and it comes before any of this.
    */
-  private openingView(response: OnlineGameView): OnlineGameView {
+  private freshDealView(response: OnlineGameView): OnlineGameView {
     const view = this.cloneView(response)
     view.phase = 'picking'
     view.passes = []
@@ -370,6 +398,7 @@ export class Play implements OnInit, OnDestroy {
       case 'picked': return `${name} picked`
       case 'passed': return `${name} passed`
       case 'buried': return `${name} buried two cards`
+      case 'unburied': return `${name} is choosing again`
       case 'called': return event.card ? `${name} called ${event.card}` : `${name} is going alone`
       case 'card_played': return `${name} played a card`
       case 'trick_won': return `${name} took the trick`

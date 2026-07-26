@@ -109,6 +109,19 @@ class CallAction:
 
 
 @dataclass(frozen=True)
+class UnburyAction:
+    """Take the buried cards back and bury again.
+
+    The picker is free to bury anything, but what they are left with decides what they may
+    call — so they need a way back until they commit. Offered to human pickers only; an AI has
+    no reason to change its mind, and offering it would let the drive loop churn bury/unbury
+    against its action cap.
+    """
+
+    type: str = "unbury"
+
+
+@dataclass(frozen=True)
 class CallUnderAction:
     """Call a partner card while placing one card face down to stand in for its suit.
 
@@ -128,7 +141,13 @@ class PlayAction:
 
 
 Action: TypeAlias = (
-    PickAction | PassAction | BuryAction | CallAction | CallUnderAction | PlayAction
+    PickAction
+    | PassAction
+    | BuryAction
+    | UnburyAction
+    | CallAction
+    | CallUnderAction
+    | PlayAction
 )
 
 

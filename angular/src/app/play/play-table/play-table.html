@@ -11,6 +11,9 @@
     <div class="seat-arc">
       @for (seat of opponents(); track seat.index; let index = $index) {
         <article [class]="'online-seat online-seat--opponent-' + index + (game().turn_seat === seat.index ? ' online-seat--turn' : '')">
+          @if (isDealer(seat.index)) {
+            <span class="dealer-chip" title="Dealer" aria-label="Dealer">D</span>
+          }
           <div class="online-seat__name">
             {{ seat.name }}
             @if (roleLabel(seat.index); as role) {
@@ -128,6 +131,21 @@
                     <button class="btn btn-primary" type="button" (click)="startUnderCall(card)">Call {{ card }}</button>
                   }
                   <button class="btn btn-secondary" type="button" (click)="call(null)">Go alone</button>
+                  @if (canUnbury()) {
+                    <button class="btn btn-secondary" type="button" (click)="unbury()">Change bury</button>
+                  }
+                </div>
+              } @else if (mustGoAlone()) {
+                <p class="table-prompt__title">You have no Aces to call, go alone?</p>
+                <!-- <p class="table-prompt__hint">
+                  Nothing you kept can reach a partner. Change what you buried to call an ace
+                  instead — there are no restrictions on burying if you go alone.
+                </p> -->
+                <div class="table-prompt__actions">
+                  <button class="btn btn-primary" type="button" (click)="call(null)">Go alone</button>
+                  @if (canUnbury()) {
+                    <button class="btn btn-secondary" type="button" (click)="unbury()">Change bury</button>
+                  }
                 </div>
               } @else {
                 <p class="table-prompt__title">Call a partner</p>
@@ -136,6 +154,9 @@
                     <button class="btn" [class.btn-primary]="choice.card" [class.btn-secondary]="!choice.card" type="button" (click)="call(choice.card)">
                       {{ choice.card ? 'Call ' + choice.card : 'Go alone' }}
                     </button>
+                  }
+                  @if (canUnbury()) {
+                    <button class="btn btn-secondary" type="button" (click)="unbury()">Change bury</button>
                   }
                 </div>
               }
@@ -146,6 +167,9 @@
     }
 
     <div class="human-seat" [class.human-seat--turn]="humanTurn()">
+      @if (isDealer(game().seat)) {
+        <span class="dealer-chip" title="Dealer" aria-label="Dealer">D</span>
+      }
       <div>
         <strong>{{ humanSeat().name }}</strong>
         @if (roleLabel(game().seat); as role) {
@@ -163,7 +187,7 @@
           class="play-card play-card--hand"
           [class.play-card--red]="parts.red"
           [class.play-card--selected]="selectedBury().includes(card) || selectedUnder() === card"
-          [class.play-card--dim]="game().phase === 'playing' && !playableCards().has(card)"
+          [class.play-card--dim]="showPlayableHint() && !playableCards().has(card)"
           [disabled]="disabled() || !humanTurn() || (game().phase !== 'burying' && !pendingUnderCall() && !playableCards().has(card))"
           (click)="chooseCard(card)"
           [attr.aria-label]="'Play ' + parts.rank + ' ' + parts.suit"

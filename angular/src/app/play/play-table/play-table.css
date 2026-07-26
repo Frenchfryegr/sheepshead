@@ -71,27 +71,31 @@
 
 .seat-arc {
   position: absolute;
-  inset: max(76px, calc(env(safe-area-inset-top) + 66px)) 1rem auto;
-  height: 180px;
+  inset: 0;
+  pointer-events: none;
 }
 
+/* Seats sit on an ellipse around the trick, with the player at its foot. Percentages rather
+   than pixels so the ring keeps its shape as the viewport changes. */
 .online-seat {
   position: absolute;
-  width: 150px;
-  padding: .55rem;
+  width: 132px;
+  padding: .5rem .45rem;
   border: 1px solid rgb(255 255 255 / 18%);
   border-radius: .75rem;
   color: #fff;
-  background: rgb(0 0 0 / 22%);
+  background: rgb(0 0 0 / 34%);
   text-align: center;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   transition: box-shadow .2s, transform .2s;
+  backdrop-filter: blur(4px);
 }
 
-.online-seat--opponent-0 { left: 12%; top: 95px; }
-.online-seat--opponent-1 { left: 37%; top: 10px; }
-.online-seat--opponent-2 { left: 63%; top: 10px; }
-.online-seat--opponent-3 { left: 88%; top: 95px; }
+/* Clockwise from the player: seat 1 is on their left, seat 4 on their right. */
+.online-seat--opponent-0 { left: 11%; top: 40%; }
+.online-seat--opponent-1 { left: 30%; top: max(76px, 13%); }
+.online-seat--opponent-2 { left: 70%; top: max(76px, 13%); }
+.online-seat--opponent-3 { left: 89%; top: 40%; }
 
 .online-seat--turn,
 .human-seat--turn {
@@ -114,6 +118,27 @@
   margin-top: .3rem;
   font-size: .72rem;
   opacity: .82;
+}
+
+/* Dealer button, sitting on the corner of the seat like the real thing. Both .online-seat
+   and .human-seat are positioned, so the negative offsets anchor to whichever it is in. */
+.dealer-chip {
+  position: absolute;
+  z-index: 2;
+  top: -10px;
+  right: -10px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid rgb(29 37 33 / 55%);
+  border-radius: 50%;
+  color: #1d2521;
+  background: #fdf6e2;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
+  font-size: .74rem;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .role-chip {
@@ -144,12 +169,14 @@
   background: repeating-linear-gradient(45deg, #173d65, #173d65 3px, #2b5e8c 3px, #2b5e8c 6px);
 }
 
+/* Dropped a little below centre and pulled in tight: the cards cluster near the middle so the
+   seats can occupy the edges without fighting them. */
 .trick-area {
   position: absolute;
-  top: 41%;
+  top: 47%;
   left: 50%;
-  width: 340px;
-  height: 250px;
+  width: 420px;
+  height: 362px;
   transform: translate(-50%, -50%);
 }
 
@@ -190,7 +217,8 @@
 .table-status {
   position: absolute;
   z-index: 14;
-  top: max(266px, calc(env(safe-area-inset-top) + 256px));
+  /* Between the top seats and the trick, now that the ring occupies both. */
+  top: max(196px, calc(env(safe-area-inset-top) + 186px));
   left: 50%;
   max-width: min(80%, 340px);
   margin: 0;
@@ -205,8 +233,8 @@
 }
 
 .play-card {
-  width: 86px;
-  height: 120px;
+  width: 116px;
+  height: 162px;
   border: 1px solid #d7d1c5;
   border-radius: 9px;
   color: #1d2521;
@@ -224,16 +252,20 @@
   position: absolute;
   display: grid;
   place-content: center;
-  font-size: 1.6rem;
+  font-size: 2.1rem;
   font-weight: 800;
   transition: transform .3s, opacity .3s;
 }
 
-.trick-card--seat-0 { --card-from-y: 120px; left: 127px; top: 130px; }
-.trick-card--seat-1 { --card-from-x: -120px; --card-from-y: -20px; left: 10px; top: 78px; transform: rotate(-12deg); }
-.trick-card--seat-2 { --card-from-x: -70px; --card-from-y: -100px; left: 52px; top: 0; transform: rotate(-5deg); }
-.trick-card--seat-3 { --card-from-x: 70px; --card-from-y: -100px; right: 52px; top: 0; transform: rotate(5deg); }
-.trick-card--seat-4 { --card-from-x: 120px; --card-from-y: -20px; right: 10px; top: 78px; transform: rotate(12deg); }
+/* One card per seat on an ellipse (rx 152, ry 100) inside the 420x362 box, matching the ring
+   the seats sit on. Derived rather than eyeballed: every card stays inside the box, no card's
+   centre — where the rank and suit are drawn — is ever covered, and the worst overlap is 16%,
+   at the outer corners of 1-on-2 and 3-on-4. Re-derive all five if the card size changes. */
+.trick-card--seat-0 { --card-from-y: 170px; left: 152px; top: 200px; }
+.trick-card--seat-1 { --card-from-x: -170px; --card-from-y: 34px; left: 7px; top: 131px; transform: rotate(-12deg); }
+.trick-card--seat-2 { --card-from-x: -110px; --card-from-y: -150px; left: 63px; top: 19px; transform: rotate(-5deg); }
+.trick-card--seat-3 { --card-from-x: 110px; --card-from-y: -150px; left: 241px; top: 19px; transform: rotate(5deg); }
+.trick-card--seat-4 { --card-from-x: 170px; --card-from-y: 34px; left: 297px; top: 131px; transform: rotate(12deg); }
 
 /* An under nobody at this seat may look at — same back as the opponents' hands. */
 .play-card--facedown {
@@ -297,7 +329,7 @@
 .human-seat {
   position: absolute;
   left: 50%;
-  bottom: max(172px, calc(env(safe-area-inset-bottom) + 162px));
+  bottom: max(220px, calc(env(safe-area-inset-bottom) + 210px));
   padding: .45rem .75rem;
   border-radius: .65rem;
   color: white;
@@ -318,13 +350,13 @@
   left: 1rem;
   display: flex;
   justify-content: center;
-  min-height: 140px;
+  min-height: 188px;
 }
 
 .play-card--hand {
   position: relative;
-  flex: 0 0 86px;
-  margin-left: -22px;
+  flex: 0 0 116px;
+  margin-left: -30px;
   padding: .25rem;
   cursor: pointer;
   transform-origin: 50% 120%;
@@ -347,17 +379,17 @@
   top: .35rem;
   left: .4rem;
   display: grid;
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   font-weight: 900;
   line-height: .8;
 }
 
 .play-card__corner small {
-  font-size: .95rem;
+  font-size: 1.18rem;
 }
 
 .play-card__suit {
-  font-size: 2.6rem;
+  font-size: 3.4rem;
 }
 
 /* Floating centre panel, mirroring the tracked Table View round-result hub. */
@@ -438,59 +470,83 @@
     min-height: 0;
   }
 
+  /* Narrower chips so the ring can reach the edges without running off them. */
   .online-seat {
-    width: 105px;
-    font-size: .75rem;
+    width: 96px;
+    padding: .4rem .3rem;
+    font-size: .72rem;
   }
 
-  .online-seat--opponent-0 { left: 10%; top: 100px; }
-  .online-seat--opponent-1 { left: 35%; top: 12px; }
-  .online-seat--opponent-2 { left: 65%; top: 12px; }
-  .online-seat--opponent-3 { left: 90%; top: 100px; }
+  .online-seat--opponent-0 { left: 14%; top: 35%; }
+  .online-seat--opponent-1 { left: 32%; top: max(84px, 14%); }
+  .online-seat--opponent-2 { left: 68%; top: max(84px, 14%); }
+  .online-seat--opponent-3 { left: 86%; top: 35%; }
 
   .online-seat__meta {
-    font-size: .62rem;
+    font-size: .6rem;
+  }
+
+  .dealer-chip {
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    font-size: .64rem;
+  }
+
+  .card-backs {
+    height: 24px;
+  }
+
+  .card-back {
+    width: 15px;
+    height: 22px;
+    margin-left: -7px;
   }
 
   .play-card {
-    width: 68px;
-    height: 96px;
+    width: 84px;
+    height: 118px;
   }
 
   .play-card--table {
-    font-size: 1.3rem;
+    font-size: 1.6rem;
   }
 
   .play-card__corner {
-    font-size: .95rem;
+    font-size: 1.15rem;
   }
 
   .play-card__corner small {
-    font-size: .8rem;
+    font-size: .96rem;
   }
 
   .play-card__suit {
-    font-size: 2.1rem;
+    font-size: 2.5rem;
   }
 
+  /* Only 34px of each card shows, which is enough for the corner index — the 8-card
+     burying hand has to fit a 360px screen. */
   .play-card--hand {
-    flex-basis: 68px;
-    margin-left: -32px;
+    flex-basis: 84px;
+    margin-left: -50px;
   }
 
+  /* Tighter still on a phone: the cards overlap more so the ring keeps the edges. */
+  /* Same ellipse scaled for the 84x118 card: rx 106, ry 72 in a 296x262 box. */
   .trick-area {
-    width: 280px;
-    height: 200px;
+    width: 296px;
+    height: 262px;
   }
 
-  .trick-card--seat-0 { --card-from-y: 96px; left: 106px; top: 104px; }
-  .trick-card--seat-1 { --card-from-x: -96px; --card-from-y: -16px; left: 6px; top: 62px; }
-  .trick-card--seat-2 { --card-from-x: -56px; --card-from-y: -80px; left: 40px; top: 0; }
-  .trick-card--seat-3 { --card-from-x: 56px; --card-from-y: -80px; right: 40px; top: 0; }
-  .trick-card--seat-4 { --card-from-x: 96px; --card-from-y: -16px; right: 6px; top: 62px; }
+  .trick-card--seat-0 { --card-from-y: 126px; left: 106px; top: 144px; }
+  .trick-card--seat-1 { --card-from-x: -126px; --card-from-y: 24px; left: 5px; top: 94px; }
+  .trick-card--seat-2 { --card-from-x: -82px; --card-from-y: -110px; left: 44px; top: 14px; }
+  .trick-card--seat-3 { --card-from-x: 82px; --card-from-y: -110px; left: 168px; top: 14px; }
+  .trick-card--seat-4 { --card-from-x: 126px; --card-from-y: 24px; left: 207px; top: 94px; }
 
   .human-seat {
-    bottom: max(148px, calc(env(safe-area-inset-bottom) + 138px));
+    bottom: max(174px, calc(env(safe-area-inset-bottom) + 164px));
   }
 
   .online-table__status {
@@ -501,17 +557,13 @@
     top: 4px;
   }
 
-  .seat-arc {
-    inset-block-start: max(102px, calc(env(safe-area-inset-top) + 92px));
-  }
-
   .hand-fan {
     bottom: max(26px, calc(env(safe-area-inset-bottom) + 16px));
-    min-height: 116px;
+    min-height: 142px;
   }
 
   .table-status {
-    top: max(292px, calc(env(safe-area-inset-top) + 282px));
+    top: max(202px, calc(env(safe-area-inset-top) + 192px));
     font-size: .78rem;
   }
 }

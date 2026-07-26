@@ -18,6 +18,7 @@ from .state import (
     PickAction,
     PlayAction,
     Seat,
+    UnburyAction,
 )
 
 
@@ -123,6 +124,75 @@ def _led_suit(state: GameState) -> str | None:
     return effective_suit(card, state.ruleset)
 
 
+def _other_hands(hand_state: HandState, seat: int) -> list[list[Card]]:
+    """Hands other than `seat`'s. Buried cards are in neither, which is what makes a buried
+    ace correctly uncallable."""
+    return [cards for index, cards in enumerate(hand_state.hands) if index != seat]
+
+
+def _called_card_candidates(
+    picker_hand: list[Card], others: list[list[Card]], ruleset: RuleSet
+) -> list[Card]:
+    """Partner cards the picker could name, one per suit at most.
+
+    Walks the rank ladder globally rather than per suit: fall through to the next rank only
+    when no suit offers a candidate at all, whatever the reason — the picker holding every ace,
+    or the missing ones being buried.
+    """
+    held = set(picker_hand)
+    for rank in _CALL_LADDER:
+        candidates = [
+            Card(suit, rank)
+            for suit in _FAIL_SUITS
+            if Card(suit, rank) not in held
+            and any(Card(suit, rank) in cards for cards in others)
+        ]
+        if candidates:
+            return candidates
+    return []
+
+
+def _ordinary_call_candidates(
+    picker_hand: list[Card], others: list[list[Card]], ruleset: RuleSet
+) -> list[Card]:
+    """Candidates the picker can follow the suit of — the calls that need no under."""
+    return [
+        candidate
+        for candidate in _called_card_candidates(picker_hand, others, ruleset)
+        if any(effective_suit(card, ruleset) == candidate.suit.value for card in picker_hand)
+    ]
+
+
+def _bury_actions(state: GameState, seat: int) -> list[Action]:
+    """Every combination. Burying is unrestricted; the *call* is what adapts to what is left.
+
+    An earlier version filtered these to forbid burying into an under. That put the restriction
+    in the wrong place: the picker is entitled to bury whatever they like, and the consequence
+    is simply that they may be left with nothing to call and have to go alone. They can also
+    change their mind (`UnburyAction`) until they commit to a call.
+    """
+    return [
+        BuryAction(tuple(cards))
+        for cards in itertools.combinations(state.hand.hands[seat], state.ruleset.blind_size)
+    ]
+
+
+def _under_is_legitimate(state: GameState, seat: int) -> bool:
+    """Whether this picker genuinely never had a suit to call, rather than burying one away.
+
+    Judged on the **pre-bury** hand — what remains plus what was buried — because that is what
+    decides whether the option ever existed. The rule: an under is theirs to take only if they
+    hold the ace of every fail suit they hold anything in. Holding a club without the ace of
+    clubs means the ace is in somebody else's hand and they could have kept a club to call it.
+    """
+    before = list(state.hand.hands[seat]) + list(state.hand.buried)
+    for suit in _FAIL_SUITS:
+        holds_suit = any(effective_suit(card, state.ruleset) == suit.value for card in before)
+        if holds_suit and Card(suit, Rank.ACE) not in before:
+            return False
+    return True
+
+
 def _call_actions(state: GameState) -> list[Action]:
     """Ordinary calls where the picker can follow the suit; unders only when none can.
 
@@ -130,41 +200,24 @@ def _call_actions(state: GameState) -> list[Action]:
     That single condition covers both source cases ("all fail cards are aces" and "no fail at
     all") and shows a called ten never needs one: calling a ten requires holding all three fail
     aces, which guarantees a card in every fail suit.
+
+    Going alone is always available. When nothing is followable the under is offered only if it
+    was never avoidable (`_under_is_legitimate`); a picker who buried their callable suit away
+    is left with alone as their only option, and may unbury and try again instead.
     """
     hand_state = state.hand
-    hand = hand_state.hands[hand_state.picker_seat]  # type: ignore[index]
-    held = set(hand)
-
-    def has_holder(card: Card) -> bool:
-        return any(card in cards for cards in hand_state.hands)
-
-    # Walk the ladder globally, not per suit: fall through to the next rank whenever no suit
-    # offers a candidate, whatever the reason — the picker holding every ace, or the missing
-    # ones being buried.
-    candidates: list[Card] = []
-    for rank in _CALL_LADDER:
-        candidates = [
-            Card(suit, rank)
-            for suit in _FAIL_SUITS
-            if Card(suit, rank) not in held and has_holder(Card(suit, rank))
-        ]
-        if candidates:
-            break
-
-    ordinary: list[Action] = []
-    under: list[Action] = []
-    for candidate in candidates:
-        holds_fail_of_suit = any(
-            effective_suit(card, state.ruleset) == candidate.suit.value for card in hand
-        )
-        if holds_fail_of_suit:
-            ordinary.append(CallAction(candidate))
-        else:
-            under.extend(CallUnderAction(candidate, card) for card in hand)
+    seat = hand_state.picker_seat
+    hand = hand_state.hands[seat]  # type: ignore[index]
+    others = _other_hands(hand_state, seat)  # type: ignore[arg-type]
 
     actions: list[Action] = [CallAction(None)]
-    # The under is forced, never chosen: offer it only when nothing ordinary exists.
-    actions.extend(ordinary or under)
+    ordinary = _ordinary_call_candidates(hand, others, state.ruleset)
+    if ordinary:
+        actions.extend(CallAction(card) for card in ordinary)
+        return actions
+    if _under_is_legitimate(state, seat):  # type: ignore[arg-type]
+        for candidate in _called_card_candidates(hand, others, state.ruleset):
+            actions.extend(CallUnderAction(candidate, under) for under in hand)
     return actions
 
 
@@ -245,16 +298,18 @@ def legal_actions(state: GameState, seat: int) -> list[Action]:
     if hand.phase == Phase.BURYING:
         if seat != hand.picker_seat:
             return []
-        return [
-            BuryAction(tuple(cards))
-            for cards in itertools.combinations(hand.hands[seat], state.ruleset.blind_size)
-        ]
+        return _bury_actions(state, seat)
     if hand.phase == Phase.CALLING:
         if seat != hand.picker_seat:
             return []
         if state.ruleset.partner_method == "called_ace":
-            return _call_actions(state)
-        return [CallAction(None)]
+            actions = _call_actions(state)
+        else:
+            actions = [CallAction(None)]
+        # Only a human changes their mind — see UnburyAction.
+        if state.seats[seat].is_human:
+            actions.append(UnburyAction())
+        return actions
     if hand.phase == Phase.PLAYING:
         return _play_actions(state, seat)
     return []
@@ -296,6 +351,12 @@ def apply_action(state: GameState, seat: int, action: Action) -> tuple[GameState
         hand.phase = Phase.CALLING
         hand.turn_seat = seat
         events.append(Event("buried", seat=seat))
+    elif isinstance(action, UnburyAction):
+        hand.hands[seat].extend(hand.buried)
+        hand.buried = []
+        hand.phase = Phase.BURYING
+        hand.turn_seat = seat
+        events.append(Event("unburied", seat=seat))
     elif isinstance(action, (CallAction, CallUnderAction)):
         hand.called_card = action.card
         if isinstance(action, CallUnderAction):

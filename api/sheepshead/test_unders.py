@@ -20,7 +20,7 @@ from .serialization import (
     full_state_to_dict,
     seat_view,
 )
-from .state import CallUnderAction, Phase, PlayAction, Seat
+from .state import BuryAction, CallUnderAction, Phase, PlayAction, Seat, UnburyAction
 
 RULES = RuleSet()
 
@@ -141,6 +141,150 @@ class CallLadderTests(unittest.TestCase):
             _cards("KD", "9D", "8D", "7D", "7C", "8C"),
         ])
         self.assertIn(None, [action.card for action in _calls(state) if action.type == "call"])
+
+
+def _called_state(hands: list[list[Card]], *, buried: list[Card], picker: int = 0):
+    """A game parked in CALLING, having already buried the given cards."""
+    state = _burying_state(hands, picker=picker)
+    state.hand.buried = list(buried)
+    state.hand.hands[picker] = [card for card in hands[picker] if card not in buried]
+    state.hand.phase = Phase.CALLING
+    return state
+
+
+def _burying_state(hands: list[list[Card]], *, picker: int = 0):
+    """A game parked in BURYING with the picker holding a full post-blind hand."""
+    state = create_game(RULES, _seats(), 4242)
+    hand = state.hand
+    hand.hands = [list(cards) for cards in hands]
+    hand.blind = []
+    hand.phase = Phase.BURYING
+    hand.picker_seat = picker
+    hand.turn_seat = picker
+    return state
+
+
+def _buries(state) -> list[set[Card]]:
+    return [
+        set(action.cards)
+        for action in legal_actions(state, state.hand.picker_seat)
+        if action.type == "bury"
+    ]
+
+
+class BuryAndCallInteractionTests(unittest.TestCase):
+    """Burying is unrestricted; what is left decides what may be called.
+
+    A picker who buries away the only suit whose ace they could call is not blocked — they are
+    simply left with going alone, and may take the cards back and choose again.
+    """
+
+    # Clubs without the ace (callable) plus hearts with the ace (not callable).
+    TWO_CLUBS_AND_THE_HEART_ACE = [
+        _cards("7C", "8C", "AH", "7H", "QC", "JD", "AD", "TD"),
+        _cards("AC", "AS", "9H", "TH", "KH", "7S"),
+        _cards("QS", "QH", "QD", "JC", "JS", "JH"),
+        _cards("KC", "TC", "KS", "TS", "9S", "8S"),
+        _cards("KD", "9D", "8D", "7D", "9C", "8H"),
+    ]
+
+    def test_every_bury_is_legal(self) -> None:
+        state = _burying_state(self.TWO_CLUBS_AND_THE_HEART_ACE)
+        offered = _buries(state)
+        self.assertEqual(28, len(offered))
+        self.assertIn(set(_cards("7C", "8C")), offered, "burying the callable suit is allowed")
+
+    def test_burying_the_callable_suit_away_leaves_only_going_alone(self) -> None:
+        state = _called_state(self.TWO_CLUBS_AND_THE_HEART_ACE, buried=_cards("7C", "8C"))
+        calls = _calls(state)
+        self.assertEqual([None], [a.card for a in calls if a.type == "call"])
+        self.assertFalse(_unders(state), "an under is not theirs to take here")
+
+    def test_keeping_a_club_offers_the_ace_of_clubs(self) -> None:
+        state = _called_state(self.TWO_CLUBS_AND_THE_HEART_ACE, buried=_cards("8C", "7H"))
+        self.assertIn(Card.parse("AC"), _called_cards(state))
+        self.assertFalse(_unders(state))
+
+    def test_holding_the_ace_of_every_suit_you_hold_still_earns_an_under(self) -> None:
+        # Ace+7 of clubs and spades: no suit was ever callable, so the under is legitimate
+        # however the picker buries.
+        hands = [
+            _cards("AC", "7C", "AS", "7S", "QC", "JD", "AD", "TD"),
+            _cards("AH", "8H", "9H", "TH", "KH", "7H"),
+            _cards("QS", "QH", "QD", "JC", "JS", "JH"),
+            _cards("KC", "TC", "8C", "9C", "KS", "TS"),
+            _cards("KD", "9D", "8D", "7D", "9S", "8S"),
+        ]
+        for bury in (_cards("QC", "JD"), _cards("AC", "7C"), _cards("7C", "7S")):
+            with self.subTest(bury=[str(card) for card in bury]):
+                state = _called_state(hands, buried=bury)
+                unders = _unders(state)
+                self.assertTrue(unders, "the under should survive any bury here")
+                self.assertEqual({Card.parse("AH")}, {action.card for action in unders})
+
+    def test_an_all_trump_hand_earns_an_under(self) -> None:
+        hands = [
+            _cards("QC", "QS", "QH", "QD", "JC", "JS", "JH", "JD"),
+            _cards("AC", "AS", "AH", "7C", "8C", "9C"),
+            _cards("7S", "8S", "9S", "7H", "8H", "9H"),
+            _cards("KC", "TC", "KS", "TS", "KH", "TH"),
+            _cards("AD", "KD", "TD", "9D", "8D", "7D"),
+        ]
+        state = _called_state(hands, buried=_cards("JH", "JD"))
+        self.assertTrue(_unders(state))
+
+
+class UnburyTests(unittest.TestCase):
+    def _state(self, *, human_picker: bool):
+        seats = [
+            Seat(index, f"Seat {index}", index == 0 if human_picker else False, "random")
+            for index in range(5)
+        ]
+        state = create_game(RULES, seats, 4242)
+        state.hand.hands = [
+            list(cards) for cards in BuryAndCallInteractionTests.TWO_CLUBS_AND_THE_HEART_ACE
+        ]
+        state.hand.blind = []
+        state.hand.buried = _cards("7C", "8C")
+        state.hand.hands[0] = [
+            card
+            for card in BuryAndCallInteractionTests.TWO_CLUBS_AND_THE_HEART_ACE[0]
+            if card not in state.hand.buried
+        ]
+        state.hand.phase = Phase.CALLING
+        state.hand.picker_seat = 0
+        state.hand.turn_seat = 0
+        return state
+
+    def test_a_human_picker_may_take_the_bury_back(self) -> None:
+        state = self._state(human_picker=True)
+        self.assertIn(UnburyAction(), legal_actions(state, 0))
+
+    def test_an_ai_picker_may_not(self) -> None:
+        # Offering it would let the drive loop churn bury/unbury against its action cap.
+        state = self._state(human_picker=False)
+        self.assertNotIn(UnburyAction(), legal_actions(state, 0))
+
+    def test_unburying_restores_the_hand_and_the_phase(self) -> None:
+        state = self._state(human_picker=True)
+        before = sorted(str(card) for card in state.hand.hands[0] + state.hand.buried)
+        state, events = apply_action(state, 0, UnburyAction())
+        self.assertEqual(Phase.BURYING, state.hand.phase)
+        self.assertEqual([], state.hand.buried)
+        self.assertEqual(before, sorted(str(card) for card in state.hand.hands[0]))
+        self.assertEqual(["unburied"], [event.type for event in events])
+
+    def test_the_picker_can_then_bury_differently_and_call(self) -> None:
+        state = self._state(human_picker=True)
+        state, _ = apply_action(state, 0, UnburyAction())
+        state, _ = apply_action(state, 0, BuryAction(tuple(_cards("8C", "7H"))))
+        self.assertEqual(Phase.CALLING, state.hand.phase)
+        self.assertIn(Card.parse("AC"), _called_cards(state))
+
+    def test_unbury_round_trips_on_the_wire(self) -> None:
+        self.assertEqual(
+            UnburyAction(), action_from_dict(json.loads(json.dumps(action_to_dict(UnburyAction()))))
+        )
 
 
 def _under_game():

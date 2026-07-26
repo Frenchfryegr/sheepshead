@@ -16,6 +16,7 @@ from .state import (
     PickAction,
     PlayAction,
     Seat,
+    UnburyAction,
 )
 
 
@@ -24,7 +25,7 @@ def card_to_json(card: Card | None) -> str | None:
 
 
 def action_to_dict(action: Action) -> dict:
-    if isinstance(action, (PickAction, PassAction)):
+    if isinstance(action, (PickAction, PassAction, UnburyAction)):
         return {"type": action.type}
     if isinstance(action, BuryAction):
         return {"type": action.type, "cards": [str(card) for card in action.cards]}
@@ -44,6 +45,8 @@ def action_from_dict(value: dict) -> Action:
             return PickAction()
         if kind == "pass":
             return PassAction()
+        if kind == "unbury":
+            return UnburyAction()
         if kind == "bury":
             cards = value.get("cards")
             if not isinstance(cards, list):

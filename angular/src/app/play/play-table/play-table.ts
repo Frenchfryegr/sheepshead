@@ -86,6 +86,17 @@ export class PlayTable {
   )
   /** Distinct partner cards offered as under calls; each pairs with any card in hand. */
   underCallCards = computed(() => [...new Set(this.underCallActions().map(action => action.card))])
+  /** The picker may take their buried cards back until they commit to a call. */
+  canUnbury = computed(() => this.game().legal_actions.some(action => action.type === 'unbury'))
+  /**
+   * Nothing left to call. Reachable by burying away the only suit whose ace was callable — the
+   * bury itself is unrestricted, so this is the consequence rather than a blocked move.
+   */
+  mustGoAlone = computed(() =>
+    this.game().phase === 'calling'
+    && this.callActions().every(action => action.card === null)
+    && this.underCallCards().length === 0,
+  )
   playableCards = computed(() =>
     new Set(
       this.game().legal_actions
@@ -110,6 +121,18 @@ export class PlayTable {
     if (!this.humanTurn()) return false
     return ['picking', 'burying', 'calling'].includes(this.game().phase)
   })
+
+  /**
+   * Whether to dim the cards that cannot be played. Keyed on a card having been led rather than
+   * on the player's turn, so they can read their options while the trick comes round to them.
+   *
+   * Legality follows from the led suit alone, so the backend's list is valid for the whole
+   * trick — which is what makes showing it early honest rather than a guess. With an empty
+   * trick there is nothing to follow and every card is playable, so nothing is dimmed.
+   */
+  showPlayableHint = computed(() =>
+    this.game().phase === 'playing' && this.game().current_trick.length > 0,
+  )
 
   /**
    * Transient status, shown as a slim pill above the trick rather than over it. Null while a
@@ -145,6 +168,14 @@ export class PlayTable {
   styleLabel(seat: OnlineSeatPublic): string | null {
     if (!seat.ai_strategy) return null
     return PlayTable.STYLE_LABELS[seat.ai_strategy] ?? null
+  }
+
+  /**
+   * Read straight off the hand state, so it follows the deal round the table on its own —
+   * `_deal_hand` rotates `dealer_seat` and `freshDealView` carries the new one into playback.
+   */
+  isDealer(seat: number): boolean {
+    return this.game().dealer_seat === seat
   }
 
   roleLabel(seat: number): string | null {
@@ -203,6 +234,10 @@ export class PlayTable {
 
   call(card: OnlineCard | null): void {
     if (!this.disabled()) this.action.emit({ type: 'call', card })
+  }
+
+  unbury(): void {
+    if (!this.disabled()) this.action.emit({ type: 'unbury' })
   }
 
   startUnderCall(card: OnlineCard): void {

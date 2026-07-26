@@ -25,6 +25,7 @@ export type OnlineAction =
   | { type: 'pick' }
   | { type: 'pass' }
   | { type: 'bury', cards: OnlineCard[] }
+  | { type: 'unbury' }
   | { type: 'call', card: OnlineCard | null }
   | { type: 'call_under', card: OnlineCard, under: OnlineCard }
   | { type: 'play', card: OnlineCard }
