@@ -14,6 +14,9 @@
           @if (isDealer(seat.index)) {
             <span class="dealer-chip" title="Dealer" aria-label="Dealer">D</span>
           }
+          @if (holdsUnder(seat.index)) {
+            <span class="under-marker" title="Holding an under" aria-label="Holding a face-down under"></span>
+          }
           <div class="online-seat__name">
             {{ seat.name }}
             @if (roleLabel(seat.index); as role) {
@@ -193,6 +196,9 @@
     <div class="human-seat" [class.human-seat--turn]="humanTurn()">
       @if (isDealer(game().seat)) {
         <span class="dealer-chip" title="Dealer" aria-label="Dealer">D</span>
+      }
+      @if (holdsUnder(game().seat)) {
+        <span class="under-marker" title="Holding an under" aria-label="Holding a face-down under"></span>
       }
       <div>
         <strong>{{ humanSeat().name }}</strong>

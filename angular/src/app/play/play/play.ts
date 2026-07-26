@@ -350,6 +350,9 @@ export class Play implements OnInit, OnDestroy {
         break
       case 'called':
         next.called_card = event.card ?? null
+        // The event deliberately omits the under card itself, so take the public flag from the
+        // response — same shape as trick_won adopting legal_actions.
+        next.under_declared = response.under_declared
         // Advancing the phase here is what lets the contract announcement fire at the right
         // moment in the narration rather than after the whole drive loop. `contractText()`
         // stays null until `playing` because a null called_card during `calling` means "not
@@ -402,6 +405,7 @@ export class Play implements OnInit, OnDestroy {
     view.picker_seat = null
     view.called_card = null
     view.under_card = null
+    view.under_declared = false
     view.partner_revealed = false
     view.partner_seat = null
     view.is_leaster = false

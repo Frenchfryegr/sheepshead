@@ -20,7 +20,7 @@ from .serialization import (
     full_state_to_dict,
     seat_view,
 )
-from .state import BuryAction, CallUnderAction, Phase, PlayAction, Seat, UnburyAction
+from .state import BuryAction, CallAction, CallUnderAction, Phase, PlayAction, Seat, UnburyAction
 
 RULES = RuleSet()
 
@@ -450,6 +450,26 @@ class UnderRedactionTests(unittest.TestCase):
             self.assertIsNone(played["card"], f"seat {seat} was told the under")
             self.assertTrue(played["under"])
             self.assertNotIn('"QC"', json.dumps(seat_view(state, seat, events=events)))
+
+    def test_the_fact_of_an_under_is_public_even_though_the_card_is_not(self) -> None:
+        # Everyone watched the card go down, so every seat is told an under exists; only the
+        # picker is told which card it is.
+        state = _under_game()
+        for seat in range(5):
+            view = seat_view(state, seat)
+            self.assertTrue(view["under_declared"], f"seat {seat} was not told")
+            self.assertEqual("QC" if seat == 0 else None, view["under_card"])
+
+    def test_no_under_declared_on_an_ordinary_call(self) -> None:
+        state = _calling_state([
+            _cards("QC", "JD", "7C", "8C", "9S", "TD"),
+            _cards("AC", "AS", "AH", "7S", "8S", "9H"),
+            _cards("QS", "QH", "QD", "JC", "JS", "JH"),
+            _cards("KC", "TC", "KS", "TS", "KH", "TH"),
+            _cards("AD", "KD", "9D", "8D", "7D", "7H"),
+        ])
+        state, _ = apply_action(state, 0, CallAction(Card.parse("AC")))
+        self.assertFalse(seat_view(state, 2)["under_declared"])
 
     def test_knowledge_leaves_a_masked_under_unseen(self) -> None:
         state = _under_game()

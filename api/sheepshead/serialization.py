@@ -279,6 +279,9 @@ def seat_view(
         "is_leaster": hand.is_leaster,
         # The picker's own under, before and after it is played. Nobody else gets this field.
         "under_card": card_to_json(hand.under_card) if seat == hand.picker_seat else None,
+        # ...but the *fact* of an under is public: everyone watched the card go down. Whether it
+        # has since been played is derivable from the `under` flag on the trick entries.
+        "under_declared": hand.under_card is not None,
         "current_trick": [
             _play_json(hand, trick_seat, card, may_see_under)
             for trick_seat, card in hand.current_trick

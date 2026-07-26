@@ -154,6 +154,23 @@
   line-height: 1;
 }
 
+/* The picker's face-down under, parked at their seat so the whole table can see they are
+   holding one. Opposite corner to the dealer button, and gone once the card is played — at
+   which point it appears in the trick instead. */
+.under-marker {
+  position: absolute;
+  z-index: 2;
+  top: -10px;
+  left: -10px;
+  width: 21px;
+  height: 29px;
+  border: 1px solid #e9ddc5;
+  border-radius: 3px;
+  background: repeating-linear-gradient(45deg, #173d65, #173d65 4px, #2b5e8c 4px, #2b5e8c 8px);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
+  transform: rotate(-9deg);
+}
+
 .role-chip {
   display: inline-block;
   margin-left: .3rem;
@@ -633,6 +650,13 @@
     width: 20px;
     height: 20px;
     font-size: .64rem;
+  }
+
+  .under-marker {
+    top: -8px;
+    left: -8px;
+    width: 17px;
+    height: 24px;
   }
 
   .card-backs {

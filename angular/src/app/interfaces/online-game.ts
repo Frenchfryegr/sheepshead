@@ -93,6 +93,8 @@ export interface OnlineGameView {
   completed_tricks: OnlineCompletedTrick[]
   /** The picker's own under card; null for every other seat. */
   under_card: OnlineCard | null
+  /** Whether the picker called under. Public — only its identity is hidden. */
+  under_declared: boolean
   legal_actions: OnlineAction[]
   hand_history: OnlineHandResult[]
   events: OnlineEvent[]

@@ -67,8 +67,26 @@ export class PlayTable {
     const picker = game.seats[game.picker_seat]?.name ?? 'The picker'
     if (!game.called_card) return `${picker} is going alone`
     const parts = this.cardParts(game.called_card)
-    return `${picker} called the ${parts.rank}${parts.suit}`
+    const under = game.under_declared ? ' under' : ''
+    return `${picker} called the ${parts.rank}${parts.suit}${under}`
   })
+
+  /**
+   * Whether the picker is still holding a face-down under. Everyone may know this — they all
+   * watched the card go down — so it is derived from public data only: the declaration flag,
+   * and whether a play carrying `under: true` has appeared in any trick yet.
+   */
+  underPending = computed(() => {
+    const game = this.game()
+    if (!game.under_declared) return false
+    const played = game.current_trick.some(play => play.under)
+      || game.completed_tricks.some(trick => trick.plays.some(play => play.under))
+    return !played
+  })
+
+  holdsUnder(seat: number): boolean {
+    return this.underPending() && this.game().picker_seat === seat
+  }
 
   humanTurn = computed(() => this.game().turn_seat === this.game().seat)
   humanSeat = computed(() => this.game().seats[this.game().seat])
