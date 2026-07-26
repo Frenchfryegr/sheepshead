@@ -248,6 +248,71 @@ class TakingTests(unittest.TestCase):
         self.assertEqual(Card.parse("7C"), _decide(state, 0))
 
 
+class CalledSuitTrickTests(unittest.TestCase):
+    """The called card is *forced* into its own trick, so it counts before it is played.
+
+    Reported from play: an opponent holding one queen ducked a called-suit trick, because the
+    pot read 3 points instead of the 14 actually at stake.
+    """
+
+    # Hearts called. Seat 4 leads a low heart; seat 0 is an opponent, void in hearts, and its
+    # only trump is the queen of clubs.
+    HANDS = [
+        _cards("QC", "9S", "7S"),
+        _cards("AH", "8H"),
+        _cards("KH", "9C"),
+        _cards("TH", "8C"),
+        _cards("7H", "9H"),
+    ]
+
+    def _state(self, **kwargs):
+        return _playing_state(
+            self.HANDS, turn=0, picker=3, partner=1, called="AH",
+            current=_trick((4, "7H")), **kwargs,
+        )
+
+    def test_an_opponent_trumps_in_to_capture_the_forced_ace(self) -> None:
+        self.assertEqual(Card.parse("QC"), _decide(self._state(), 0))
+
+    def test_it_still_trumps_once_the_ace_is_actually_on_the_table(self) -> None:
+        # Same trick a beat later: now the 11 points are visible in trick_points instead of
+        # being anticipated, and the decision must not change.
+        state = _playing_state(
+            self.HANDS, turn=0, picker=3, partner=1, called="AH", revealed=True,
+            current=_trick((4, "7H"), (1, "AH")),
+        )
+        self.assertEqual(Card.parse("QC"), _decide(state, 0))
+
+    def test_the_bonus_does_not_apply_once_the_partner_is_known_spent(self) -> None:
+        # Partner revealed and the called card gone: nothing is forced any more, so a lone
+        # queen goes back to being too expensive for a trick worth 4.
+        hands = [_cards("QC", "9S", "7S"), _cards("8H",), _cards("KH", "9C"),
+                 _cards("TH", "8C"), _cards("7H", "9H")]
+        state = _playing_state(
+            hands, turn=0, picker=3, partner=1, called="AH", revealed=True,
+            current=_trick((4, "7H")),
+        )
+        self.assertNotEqual(Card.parse("QC"), _decide(state, 0))
+
+    def test_the_pickers_side_does_not_get_the_bonus(self) -> None:
+        # The ace is already coming to the picker's team, so counting it would only buy
+        # over-trumping their own partner. Seat 0 is the picker here, same cards.
+        state = _playing_state(
+            self.HANDS, turn=0, picker=0, partner=1, called="AH",
+            current=_trick((4, "7H")),
+        )
+        self.assertNotEqual(Card.parse("QC"), _decide(state, 0))
+
+    def test_no_bonus_on_a_trick_in_another_suit(self) -> None:
+        # Clubs led, hearts called: nothing is forced, so the queen stays home.
+        hands = [_cards("QC", "9S", "7S"), _cards("AH", "8H"), _cards("KH", "9C"),
+                 _cards("TH", "8C"), _cards("7C", "9H")]
+        state = _playing_state(
+            hands, turn=0, picker=3, partner=1, called="AH", current=_trick((4, "7C")),
+        )
+        self.assertNotEqual(Card.parse("QC"), _decide(state, 0))
+
+
 class LeadTests(unittest.TestCase):
     # Both cases use the same hand, where the called suit's card (9H) is *not* the cheapest
     # fail (7C is). Only then does the choice reveal whether the called suit was targeted

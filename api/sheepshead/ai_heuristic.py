@@ -496,9 +496,31 @@ class HeuristicStrategy:
         pool = losers or plays
         return min(pool, key=lambda play: (card_points(play.card), card_cost(play.card, ruleset)))
 
+    def _committed_points(self, knowledge: Knowledge) -> int:
+        """Points certain to land in this trick that have not been played yet.
+
+        Exactly one card is ever forced: when the called suit is led, `legal_actions` compels the
+        partner to produce the called card. Its points are as good as in the pot already, which
+        is the difference between reading a called-suit trick as worth 3 and as worth 14 — and
+        the reason an opponent holding one queen would duck a trick it should take.
+
+        Only opponents get this. On the picker's side the called card is already coming to them,
+        so counting it would only buy over-trumping their own partner's ace.
+        """
+        called = knowledge.called_card
+        if called is None or knowledge.is_leaster:
+            return 0
+        if knowledge.partner_revealed:
+            return 0  # already on the table, so trick_points has it
+        if knowledge.led_suit != called.suit.value:
+            return 0
+        if self._on_picker_team(knowledge):
+            return 0
+        return card_points(called)
+
     def _worth_taking(self, knowledge: Knowledge, play: PlayAction) -> bool:
         cost = card_cost(play.card, knowledge.ruleset)
-        pot = knowledge.trick_points + card_points(play.card)
+        pot = knowledge.trick_points + card_points(play.card) + self._committed_points(knowledge)
         if knowledge.plays_remaining_in_trick == 0:
             # Last to play, so taking it is certain: any points at all beat a cheap card.
             return pot > 0 or cost <= self.style.cheap_trump_cost
