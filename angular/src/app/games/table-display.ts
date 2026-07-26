@@ -16,6 +16,9 @@ export class TableDisplay {
     private isBrowser = isPlatformBrowser(this.platformId)
     private wakeLock: WakeLockSentinel | null = null
     private active = false
+    // Only exit fullscreen if we were the ones who asked for it. Online play never does, so
+    // without this a player who hit F11 themselves would be dropped out of it on leaving.
+    private ownsFullscreen = false
 
     // The browser releases the wake lock whenever the tab is backgrounded (e.g. the user takes
     // a call mid-game). Re-acquire it when we come back, as long as Table View is still on.
@@ -23,17 +26,26 @@ export class TableDisplay {
         if (this.active && document.visibilityState === 'visible') void this.acquireWakeLock()
     }
 
-    // Must be called from inside a user-gesture handler — fullscreen requests are rejected
-    // otherwise.
-    async enable(element: HTMLElement): Promise<void> {
+    // Pass an element to also request browser fullscreen, which must happen from inside a
+    // user-gesture handler or it is rejected.
+    //
+    // Tracked Table View asks for it: the phone is lying flat on the table for a whole session
+    // and the browser chrome is just in the way. Online play deliberately does not — it is a
+    // normal browsing session the player dips in and out of, and being trapped in fullscreen
+    // reads as the app overstepping. Both still get the wake lock and the dark canvas.
+    async enable(element?: HTMLElement): Promise<void> {
         if (!this.isBrowser || this.active) return
         this.active = true
         // Match the canvas to the felt, so the iOS home-indicator strip isn't a white band.
         document.documentElement.classList.add(DARK_CANVAS_CLASS)
         document.addEventListener('visibilitychange', this.onVisibilityChange)
         await this.acquireWakeLock()
+        if (!element) return
         try {
-            if (!document.fullscreenElement) await element.requestFullscreen?.()
+            if (!document.fullscreenElement) {
+                await element.requestFullscreen?.()
+                this.ownsFullscreen = true
+            }
         } catch {
             // Denied or unsupported — the CSS layout still fills the viewport.
         }
@@ -45,10 +57,12 @@ export class TableDisplay {
         document.documentElement.classList.remove(DARK_CANVAS_CLASS)
         document.removeEventListener('visibilitychange', this.onVisibilityChange)
         await this.releaseWakeLock()
+        const owned = this.ownsFullscreen
+        this.ownsFullscreen = false
         try {
             // The user may already have left fullscreen themselves (Esc, system gesture) —
             // calling exitFullscreen() with nothing fullscreened throws.
-            if (document.fullscreenElement) await document.exitFullscreen()
+            if (owned && document.fullscreenElement) await document.exitFullscreen()
         } catch {
             // Nothing actionable.
         }

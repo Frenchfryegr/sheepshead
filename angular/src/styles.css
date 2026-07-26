@@ -23,6 +23,8 @@ app-profile,
 app-badges,
 app-achievements,
 app-statistics,
+app-play,
+app-play-table,
 router-outlet {
   display: block;
 }
@@ -47,4 +49,106 @@ html, body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Online Play spans a page component and a nested table component. Keep its shared controls
+   here (scoped under app-play) so Angular's component style encapsulation cannot strand the
+   table buttons without the lobby's button styles. */
+app-play .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.65rem 1.1rem;
+  border: 1px solid rgb(20 61 46 / 20%);
+  border-radius: 0.7rem;
+  color: #173c2e;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgb(11 36 28 / 10%);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 750;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+app-play .btn:hover:not(:disabled) {
+  border-color: rgb(20 84 59 / 38%);
+  box-shadow: 0 5px 14px rgb(11 36 28 / 15%);
+  transform: translateY(-1px);
+}
+
+app-play .btn:active:not(:disabled) {
+  box-shadow: 0 2px 6px rgb(11 36 28 / 12%);
+  transform: translateY(0);
+}
+
+app-play .btn:focus-visible,
+app-play .input:focus-visible {
+  outline: 3px solid rgb(235 202 104 / 48%);
+  outline-offset: 2px;
+}
+
+app-play .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+app-play .btn-primary {
+  border-color: #d9b84f;
+  color: #263318;
+  background: linear-gradient(145deg, #f1d578, #ddb84e);
+  box-shadow: 0 3px 10px rgb(129 95 12 / 24%);
+}
+
+app-play .btn-primary:hover:not(:disabled) {
+  border-color: #c69f2f;
+  background: linear-gradient(145deg, #f5dc86, #e5c15b);
+  box-shadow: 0 6px 16px rgb(129 95 12 / 28%);
+}
+
+app-play .btn-secondary {
+  border-color: #cad6cf;
+  color: #214c3a;
+  background: #f2f6f3;
+}
+
+app-play .btn-secondary:hover:not(:disabled) {
+  background: #e6eee9;
+}
+
+app-play .input {
+  min-height: 44px;
+  padding: 0.6rem 2.4rem 0.6rem 0.8rem;
+  border: 1px solid #b8c8bf;
+  border-radius: 0.7rem;
+  color: #173c2e;
+  background-color: #ffffff;
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+app-play .input:hover {
+  border-color: #6f9482;
+}
+
+app-play .btn-close {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #3e5047;
+  background: transparent;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+app-play .btn-close:hover {
+  background: #edf2ef;
 }

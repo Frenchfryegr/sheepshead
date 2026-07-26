@@ -6,5 +6,6 @@ export const environment = {
     auth: "auth",
     badges: "badges",
     achievements: "achievements",
-    statistics: "statistics"
+    statistics: "statistics",
+    onlineGames: "online-games"
 };

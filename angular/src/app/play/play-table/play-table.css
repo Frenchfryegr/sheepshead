@@ -1,0 +1,536 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.online-table {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  color: #f3f4f6;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.online-table__status {
+  position: absolute;
+  z-index: 20;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  left: max(12px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.online-table__status > div {
+  display: grid;
+  text-align: center;
+}
+
+.online-table__status span {
+  color: rgb(243 244 246 / 65%);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.table-link {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  border: 0;
+  border-radius: 999px;
+  padding: .5rem .75rem;
+  color: rgb(243 244 246 / 82%);
+  background: rgb(0 0 0 / 24%);
+  text-decoration: underline;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+}
+
+.online-table__felt {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(to bottom, rgb(11 32 25 / 0%) calc(100% - 150px), #0b2019 100%),
+    radial-gradient(circle at 50% 43%, #2e835e, #15543b 66%, #0b2019);
+  box-shadow: inset 0 0 70px rgb(0 0 0 / 32%);
+}
+
+.seat-arc {
+  position: absolute;
+  inset: max(76px, calc(env(safe-area-inset-top) + 66px)) 1rem auto;
+  height: 180px;
+}
+
+.online-seat {
+  position: absolute;
+  width: 150px;
+  padding: .55rem;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: .75rem;
+  color: #fff;
+  background: rgb(0 0 0 / 22%);
+  text-align: center;
+  transform: translateX(-50%);
+  transition: box-shadow .2s, transform .2s;
+}
+
+.online-seat--opponent-0 { left: 12%; top: 95px; }
+.online-seat--opponent-1 { left: 37%; top: 10px; }
+.online-seat--opponent-2 { left: 63%; top: 10px; }
+.online-seat--opponent-3 { left: 88%; top: 95px; }
+
+.online-seat--turn,
+.human-seat--turn {
+  box-shadow: 0 0 0 3px #ebca68, 0 0 24px rgb(235 202 104 / 50%);
+}
+
+.online-seat__name {
+  font-weight: 800;
+}
+
+.online-seat__style {
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .6;
+}
+
+.online-seat__meta {
+  margin-top: .3rem;
+  font-size: .72rem;
+  opacity: .82;
+}
+
+.role-chip {
+  display: inline-block;
+  margin-left: .3rem;
+  padding: .1rem .35rem;
+  border-radius: 99px;
+  color: #2d2410;
+  background: #ebca68;
+  font-size: .64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.card-backs {
+  display: flex;
+  justify-content: center;
+  height: 30px;
+  margin-top: .3rem;
+}
+
+.card-back {
+  width: 19px;
+  height: 28px;
+  margin-left: -9px;
+  border: 1px solid #e9ddc5;
+  border-radius: 3px;
+  background: repeating-linear-gradient(45deg, #173d65, #173d65 3px, #2b5e8c 3px, #2b5e8c 6px);
+}
+
+.trick-area {
+  position: absolute;
+  top: 41%;
+  left: 50%;
+  width: 340px;
+  height: 250px;
+  transform: translate(-50%, -50%);
+}
+
+/* Contract announcement: what this hand is. Shows itself for a few seconds and leaves.
+   Never interactive — pointer-events is off so a card underneath stays tappable. */
+.table-announce {
+  position: absolute;
+  z-index: 17;
+  top: 41%;
+  left: 50%;
+  max-width: min(86%, 380px);
+  margin: 0;
+  padding: .8rem 1.4rem;
+  border: 1px solid rgb(242 211 111 / 45%);
+  border-radius: 999px;
+  color: #fdf6e2;
+  background: rgb(8 24 18 / 92%);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 55%);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  /* Duration must match PlayTable.ANNOUNCEMENT_MS, which removes the element. */
+  animation: announce 3500ms ease both;
+}
+
+/* Every step keeps the -50% Y that centres it against `top: 41%`; only the small offset and
+   the scale move. Dropping it from one step would make the banner jump half its height. */
+@keyframes announce {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% - 10px)) scale(.96); }
+  8%, 78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 10px)) scale(.98); }
+}
+
+/* Transient status. Sits above the trick rather than over it, so a card landing is never
+   hidden by the commentary describing it. */
+.table-status {
+  position: absolute;
+  z-index: 14;
+  top: max(266px, calc(env(safe-area-inset-top) + 256px));
+  left: 50%;
+  max-width: min(80%, 340px);
+  margin: 0;
+  padding: .4rem .9rem;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 88%);
+  background: rgb(8 24 18 / 72%);
+  font-size: .85rem;
+  text-align: center;
+  transform: translateX(-50%);
+  backdrop-filter: blur(6px);
+}
+
+.play-card {
+  width: 86px;
+  height: 120px;
+  border: 1px solid #d7d1c5;
+  border-radius: 9px;
+  color: #1d2521;
+  background: #fffdf8;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 22%);
+}
+
+.play-card--red {
+  color: #b3262e;
+}
+
+.play-card--table {
+  --card-from-x: 0;
+  --card-from-y: 0;
+  position: absolute;
+  display: grid;
+  place-content: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+  transition: transform .3s, opacity .3s;
+}
+
+.trick-card--seat-0 { --card-from-y: 120px; left: 127px; top: 130px; }
+.trick-card--seat-1 { --card-from-x: -120px; --card-from-y: -20px; left: 10px; top: 78px; transform: rotate(-12deg); }
+.trick-card--seat-2 { --card-from-x: -70px; --card-from-y: -100px; left: 52px; top: 0; transform: rotate(-5deg); }
+.trick-card--seat-3 { --card-from-x: 70px; --card-from-y: -100px; right: 52px; top: 0; transform: rotate(5deg); }
+.trick-card--seat-4 { --card-from-x: 120px; --card-from-y: -20px; right: 10px; top: 78px; transform: rotate(12deg); }
+
+/* An under nobody at this seat may look at — same back as the opponents' hands. */
+.play-card--facedown {
+  border-color: #e9ddc5;
+  color: rgb(255 255 255 / 72%);
+  background: repeating-linear-gradient(45deg, #173d65, #173d65 6px, #2b5e8c 6px, #2b5e8c 12px);
+}
+
+.play-card__facedown-mark {
+  font-size: 1.9rem;
+  font-weight: 900;
+  opacity: .55;
+}
+
+/* The picker's own under, face up to them alone. */
+.play-card--under {
+  outline: 3px dashed rgb(242 211 111 / 85%);
+  outline-offset: -5px;
+}
+
+.play-card--fresh {
+  animation: card-arrive 220ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.play-card--winner {
+  z-index: 3;
+  outline: 4px solid #f2d36f;
+  box-shadow: 0 0 24px rgb(242 211 111 / 85%);
+}
+
+.play-card__order {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  color: #183c2e;
+  background: #f2d36f;
+  box-shadow: 0 2px 7px rgb(0 0 0 / 28%);
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+@keyframes card-arrive {
+  from {
+    opacity: 0;
+    scale: .7;
+    translate: var(--card-from-x) var(--card-from-y);
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+.human-seat {
+  position: absolute;
+  left: 50%;
+  bottom: max(172px, calc(env(safe-area-inset-bottom) + 162px));
+  padding: .45rem .75rem;
+  border-radius: .65rem;
+  color: white;
+  background: rgb(0 0 0 / 24%);
+  transform: translateX(-50%);
+}
+
+.human-seat__score {
+  margin-left: .6rem;
+  font-size: .78rem;
+  opacity: .82;
+}
+
+.hand-fan {
+  position: absolute;
+  right: 1rem;
+  bottom: max(26px, calc(env(safe-area-inset-bottom) + 16px));
+  left: 1rem;
+  display: flex;
+  justify-content: center;
+  min-height: 140px;
+}
+
+.play-card--hand {
+  position: relative;
+  flex: 0 0 86px;
+  margin-left: -22px;
+  padding: .25rem;
+  cursor: pointer;
+  transform-origin: 50% 120%;
+  transition: transform .18s, filter .18s, opacity .18s;
+}
+
+.play-card--hand:not(:disabled):hover,
+.play-card--selected {
+  z-index: 2;
+  transform: translateY(-18px);
+}
+
+.play-card--dim {
+  filter: saturate(.45);
+  opacity: .45;
+}
+
+.play-card__corner {
+  position: absolute;
+  top: .35rem;
+  left: .4rem;
+  display: grid;
+  font-size: 1.1rem;
+  font-weight: 900;
+  line-height: .8;
+}
+
+.play-card__corner small {
+  font-size: .95rem;
+}
+
+.play-card__suit {
+  font-size: 2.6rem;
+}
+
+/* Floating centre panel, mirroring the tracked Table View round-result hub. */
+.table-prompt {
+  position: absolute;
+  z-index: 16;
+  top: 41%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .85rem;
+  width: max-content;
+  max-width: min(84%, 320px);
+  padding: 1.1rem 1.25rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 18px;
+  color: #f3f4f6;
+  background: rgb(8 24 18 / 92%);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 55%);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(8px);
+}
+
+.table-prompt__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.table-prompt__hint {
+  margin: -.35rem 0 0;
+  color: rgb(243 244 246 / 62%);
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.table-prompt__actions {
+  display: flex;
+  justify-content: center;
+  gap: .6rem;
+}
+
+.table-prompt__actions .btn {
+  min-width: 96px;
+  min-height: 44px;
+}
+
+.history-dialog {
+  width: min(580px, calc(100% - 2rem));
+  max-height: 80vh;
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: 0 20px 70px rgb(0 0 0 / 30%);
+}
+
+.history-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.history-dialog ol {
+  display: grid;
+  gap: .75rem;
+  padding-left: 1.5rem;
+}
+
+.history-dialog li span {
+  display: block;
+  color: #68736d;
+  font-size: .85rem;
+}
+
+@media (max-width: 720px) {
+  .online-table__felt {
+    min-height: 0;
+  }
+
+  .online-seat {
+    width: 105px;
+    font-size: .75rem;
+  }
+
+  .online-seat--opponent-0 { left: 10%; top: 100px; }
+  .online-seat--opponent-1 { left: 35%; top: 12px; }
+  .online-seat--opponent-2 { left: 65%; top: 12px; }
+  .online-seat--opponent-3 { left: 90%; top: 100px; }
+
+  .online-seat__meta {
+    font-size: .62rem;
+  }
+
+  .play-card {
+    width: 68px;
+    height: 96px;
+  }
+
+  .play-card--table {
+    font-size: 1.3rem;
+  }
+
+  .play-card__corner {
+    font-size: .95rem;
+  }
+
+  .play-card__corner small {
+    font-size: .8rem;
+  }
+
+  .play-card__suit {
+    font-size: 2.1rem;
+  }
+
+  .play-card--hand {
+    flex-basis: 68px;
+    margin-left: -32px;
+  }
+
+  .trick-area {
+    width: 280px;
+    height: 200px;
+  }
+
+  .trick-card--seat-0 { --card-from-y: 96px; left: 106px; top: 104px; }
+  .trick-card--seat-1 { --card-from-x: -96px; --card-from-y: -16px; left: 6px; top: 62px; }
+  .trick-card--seat-2 { --card-from-x: -56px; --card-from-y: -80px; left: 40px; top: 0; }
+  .trick-card--seat-3 { --card-from-x: 56px; --card-from-y: -80px; right: 40px; top: 0; }
+  .trick-card--seat-4 { --card-from-x: 96px; --card-from-y: -16px; right: 6px; top: 62px; }
+
+  .human-seat {
+    bottom: max(148px, calc(env(safe-area-inset-bottom) + 138px));
+  }
+
+  .online-table__status {
+    top: max(58px, calc(env(safe-area-inset-top) + 48px));
+  }
+
+  .online-table__status .table-link {
+    top: 4px;
+  }
+
+  .seat-arc {
+    inset-block-start: max(102px, calc(env(safe-area-inset-top) + 92px));
+  }
+
+  .hand-fan {
+    bottom: max(26px, calc(env(safe-area-inset-bottom) + 16px));
+    min-height: 116px;
+  }
+
+  .table-status {
+    top: max(292px, calc(env(safe-area-inset-top) + 282px));
+    font-size: .78rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-card,
+  .online-seat {
+    transition-duration: .01ms;
+  }
+
+  .play-card--fresh {
+    animation-duration: 80ms;
+  }
+
+  /* Keep the banner up for its full time — the timer, not the animation, removes it — but
+     drop the movement and fade it straight in. */
+  .table-announce {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    animation: none;
+  }
+}
