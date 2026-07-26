@@ -50,9 +50,15 @@ FIRST_SEAT_PICK_BAR = BALANCED.first_seat_pick_bar
 LAST_SEAT_PICK_BAR = BALANCED.last_seat_pick_bar
 
 # The last seat's alternative is a leaster, not someone else's problem. A hand that would play
-# the leaster badly lowers its own bar — but at 1.6 this was compounding an already low bar.
+# the leaster badly lowers its own bar.
+#
+# Measured twice and cut twice. At 1.6, and again at 1.2, it was far larger than the gap between
+# adjacent seats (0.675), so it dominated position rather than adjusting it: pick rates ran
+# 18/24/32/43/67, a +24 jump at the last seat against +6/+8/+11 elsewhere. It fires on any hand
+# holding aces and tens, which is most of them, so the last seat was effectively playing to a bar
+# of 10.6 rather than 11.8.
 POOR_LEASTER_STRENGTH = 0.0
-POOR_LEASTER_RELIEF = 1.2
+POOR_LEASTER_RELIEF = 0.6
 
 # Going alone pays (num_players - 1) x instead of 2 x, but faces four opponents unaided.
 # Measured at 22.0: 32% of picked hands went alone, which is not "monsters only" — post-bury

@@ -354,6 +354,69 @@ class UnderPlayTests(unittest.TestCase):
         )
 
 
+class UnderSuitIdentityTests(unittest.TestCase):
+    """An under answers only to the suit it represents, never to its printed one.
+
+    Reported from play: a king of hearts placed under for spades was dragged out by a heart
+    lead, when it should have been held for the spade lead it was committed to.
+
+    Note the shape these hands have to take. If the under is a fail card, the picker must also
+    hold that suit's ace — otherwise the suit would have been ordinarily callable and no under
+    would be offered at all. So the under is either the ace itself, a trump, or accompanied by
+    its own ace.
+    """
+
+    def _called_under(self, picker_hand: list[Card], called: str, under: str):
+        state = _calling_state([
+            picker_hand,
+            _cards("AC", "AS", "7S", "8S", "9S", "TS"),
+            _cards("QS", "QH", "QD", "JC", "JS", "JH"),
+            _cards("KC", "TC", "9C", "8C", "KS", "7C"),
+            _cards("KD", "8D", "7D", "7H", "8H", "9H"),
+        ])
+        state, _ = apply_action(
+            state, 0, CallUnderAction(Card.parse(called), Card.parse(under))
+        )
+        return state
+
+    def _playable(self, state, led: tuple[int, str]) -> list[Card]:
+        state.hand.current_trick = [(led[0], Card.parse(led[1]))]
+        state.hand.turn_seat = 0
+        return [action.card for action in legal_actions(state, 0) if action.type == "play"]
+
+    def test_a_heart_lead_has_no_claim_on_a_heart_under(self) -> None:
+        # A-hearts is the under, standing in for spades, and is the picker's only heart. Before
+        # the fix a heart lead forced it out; now it is simply not a heart.
+        state = self._called_under(_cards("AH", "QC", "JD", "AD", "TD", "9D"), "AS", "AH")
+        playable = self._playable(state, (4, "7H"))
+        self.assertNotIn(Card.parse("AH"), playable)
+        # The whole hand bar the under — spelled out rather than counted, so it stays honest
+        # if the fixture ever changes.
+        self.assertEqual(set(_cards("QC", "JD", "AD", "TD", "9D")), set(playable))
+
+    def test_a_real_card_of_the_led_suit_must_still_be_followed(self) -> None:
+        # K-hearts under for spades, but the picker also holds A-hearts. The real heart is the
+        # one the lead reaches — the under is excluded, not the follow-suit rule.
+        state = self._called_under(_cards("AH", "KH", "QC", "JD", "AD", "TD"), "AS", "KH")
+        self.assertEqual([Card.parse("AH")], self._playable(state, (4, "7H")))
+
+    def test_a_trump_lead_has_no_claim_on_a_trump_under(self) -> None:
+        state = self._called_under(_cards("AH", "QC", "JD", "AD", "TD", "9D"), "AS", "QC")
+        playable = self._playable(state, (2, "QD"))
+        self.assertNotIn(Card.parse("QC"), playable)
+        # The other trump are still bound by follow-suit.
+        self.assertEqual(set(_cards("JD", "AD", "TD", "9D")), set(playable))
+
+    def test_the_called_suit_still_claims_it(self) -> None:
+        state = self._called_under(_cards("AH", "QC", "JD", "AD", "TD", "9D"), "AS", "AH")
+        self.assertEqual([Card.parse("AH")], self._playable(state, (1, "7S")))
+
+    def test_it_is_still_playable_as_a_last_resort(self) -> None:
+        state = self._called_under(_cards("AH", "QC", "JD", "AD", "TD", "9D"), "AS", "AH")
+        state.hand.hands[0] = _cards("AH")
+        self.assertEqual([Card.parse("AH")], self._playable(state, (4, "7H")))
+
+
 class TrickWinnerTests(unittest.TestCase):
     def test_the_under_cannot_win_even_as_the_highest_card(self) -> None:
         trick = [

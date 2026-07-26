@@ -124,6 +124,24 @@ def _led_suit(state: GameState) -> str | None:
     return effective_suit(card, state.ruleset)
 
 
+def _follow_suit(state: GameState, seat: int, card: Card) -> str:
+    """The suit a card counts as when following — its effective suit, with one exception.
+
+    The picker's under stands in for the called suit and **stops counting as its own**. A king of
+    hearts placed under for spades is a spade for every purpose that matters: a heart lead has no
+    claim on it, and it must be kept back for the spade lead it was committed to.
+    """
+    hand = state.hand
+    if (
+        hand.under_card is not None
+        and hand.called_card is not None
+        and seat == hand.picker_seat
+        and card == hand.under_card
+    ):
+        return hand.called_card.suit.value
+    return effective_suit(card, state.ruleset)
+
+
 def _other_hands(hand_state: HandState, seat: int) -> list[list[Card]]:
     """Hands other than `seat`'s. Buried cards are in neither, which is what makes a buried
     ace correctly uncallable."""
@@ -226,7 +244,8 @@ def _play_actions(state: GameState, seat: int) -> list[Action]:
     cards = list(hand_state.hands[seat])
     led = _led_suit(state)
     if led is not None:
-        following = [card for card in cards if effective_suit(card, state.ruleset) == led]
+        # _follow_suit, not effective_suit: an under answers only to the suit it represents.
+        following = [card for card in cards if _follow_suit(state, seat, card) == led]
         legal_cards = following or cards
     else:
         legal_cards = cards

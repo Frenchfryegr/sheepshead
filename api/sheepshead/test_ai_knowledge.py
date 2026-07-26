@@ -110,6 +110,50 @@ class KnowledgeTests(unittest.TestCase):
         # After seat 2 plays, only seats 3 and 4 are left.
         self.assertEqual(2, knowledge.plays_remaining_in_trick)
 
+    def test_an_unplayed_under_suspends_void_inference_for_the_picker(self) -> None:
+        # The picker's under is exempt from follow-suit, so discarding on a club lead while
+        # holding a club is legal — and nobody watching knows which suit the face-down card is.
+        # Claiming a void here would be claiming something that might be false.
+        trick = _trick((1, "AC"), (0, "7S"), (2, "KC"), (3, "9C"), (4, "8C"))
+        state = _state(
+            _deal(_cards("9C", "TC"), _cards("8S"), _cards("7C"), _cards("QC"), _cards("QS")),
+            picker=0,
+            called="AH",
+            partner=2,
+            completed=(trick,),
+        )
+        state.hand.under_card = Card.parse("9C")
+        knowledge = read_view(seat_view(state, 2))
+        self.assertEqual(frozenset(), knowledge.voids[0], "the picker is exempt, not void")
+
+    def test_the_exemption_lifts_once_the_under_is_played(self) -> None:
+        under_trick = _trick((1, "7H"), (0, "9C"), (2, "8H"), (3, "9H"), (4, "TH"))
+        later = _trick((1, "AC"), (0, "7S"), (2, "KC"), (3, "8C"), (4, "TC"))
+        state = _state(
+            _deal(_cards("QD"), _cards("8S"), _cards("7C"), _cards("QC"), _cards("QS")),
+            picker=0,
+            called="AH",
+            partner=2,
+            completed=(under_trick, later),
+        )
+        state.hand.under_card = Card.parse("9C")
+        knowledge = read_view(seat_view(state, 2))
+        # The under fell in the first trick, so the second one proves a club void as normal.
+        self.assertEqual(frozenset({"C"}), knowledge.voids[0])
+
+    def test_other_seats_are_never_exempt(self) -> None:
+        trick = _trick((1, "AC"), (3, "7S"), (0, "9C"), (2, "KC"), (4, "8C"))
+        state = _state(
+            _deal(_cards("TC"), _cards("8S"), _cards("7C"), _cards("QC"), _cards("QS")),
+            picker=0,
+            called="AH",
+            partner=2,
+            completed=(trick,),
+        )
+        state.hand.under_card = Card.parse("TC")
+        knowledge = read_view(seat_view(state, 2))
+        self.assertEqual(frozenset({"C"}), knowledge.voids[3], "only the picker holds an under")
+
     def test_unseen_accounts_for_every_card(self) -> None:
         trick = _trick((0, "AC"), (1, "KC"), (2, "7S"), (3, "9C"), (4, "QC"))
         state = _state(

@@ -124,9 +124,25 @@ def _trick_led_suit(trick: list[_Play], ruleset: RuleSet, called: Card | None) -
 
 
 def _infer_voids(
-    tricks: list[list[_Play]], ruleset: RuleSet, num_players: int, called: Card | None
+    tricks: list[list[_Play]],
+    ruleset: RuleSet,
+    num_players: int,
+    called: Card | None,
+    picker_seat: int | None,
+    under_outstanding: bool,
 ) -> tuple[frozenset[str], ...]:
-    """A seat that could follow, must. Failing to follow is proof of a void, not a hint."""
+    """A seat that could follow, must. Failing to follow is proof of a void, not a hint.
+
+    With one exception, and it is a real one rather than a caution: a picker holding an unplayed
+    under is exempt from follow-suit for that one card, so they can legally discard on a club
+    lead while still holding a club. Nobody watching knows which suit the face-down card is, so
+    no void can be *proven* for that seat until it has been played. Knowledge claims to be exact,
+    so it says nothing rather than something that might be false.
+
+    The exemption is dropped as soon as the under falls. Voids missed during the window are not
+    recovered afterwards — that would mean re-reading earlier tricks against a card most seats
+    still cannot see, for very little.
+    """
     voids: list[set[str]] = [set() for _ in range(num_players)]
     for trick in tricks:
         led = _trick_led_suit(trick, ruleset, called)
@@ -138,8 +154,12 @@ def _infer_voids(
             # when discarded elsewhere its real suit is not public.
             if play.under or play.card is None:
                 continue
+            if under_outstanding and play.seat == picker_seat:
+                continue
             if effective_suit(play.card, ruleset) != led:
                 voids[play.seat].add(led)
+        if any(play.under for play in trick):
+            under_outstanding = False
     return tuple(frozenset(suits) for suits in voids)
 
 
@@ -165,7 +185,14 @@ def read_view(view: dict) -> Knowledge:
         if play.card is not None
     )
     # The open trick is evidence too — a seat that just failed to follow is void right now.
-    voids = _infer_voids(completed + [current], ruleset, num_players, called_card)
+    voids = _infer_voids(
+        completed + [current],
+        ruleset,
+        num_players,
+        called_card,
+        view.get("picker_seat"),
+        bool(view.get("under_declared")),
+    )
 
     # For anyone but the picker this still contains the two dead bury/blind cards, which is
     # exactly a human's information state. Do not try to correct for it.

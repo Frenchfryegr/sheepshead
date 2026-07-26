@@ -63,6 +63,15 @@ SINGLETON_BONUS = 0.8
 # still an asset — but a third means no fail at all, which is the awkward "under" case, not a
 # bonus. Count at most two.
 MAX_COUNTED_VOIDS = 2
+# Holding all three fail suits is a real negative, and the blind makes it stick: picking adds two
+# unknown cards each ~56% likely to be fail, so a hand with three fail suits before the blind
+# usually still has three after burying. It cannot be buried away.
+#
+# It cannot be raised much, though, and the reason is worth knowing. The "three high queens must
+# pick" anchor hand *itself* holds all three fail suits (QC QS QH + 8C 7S 9H), so this penalty
+# comes straight off the anchor: it scores 16.8 - penalty, against a highest first-seat bar of
+# 15.2 for Cautious. Anything above 1.6 makes three high queens fail to pick, breaking the
+# anchor for four of the five styles. Raising it means moving the bars in the same commit.
 ALL_THREE_FAILS_PENALTY = 1.5
 
 BARE_ACE_BONUS = 2.4
