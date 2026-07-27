@@ -227,6 +227,40 @@
         ></button>
       }
     </div>
+
+    @if (previousTrick(); as trick) {
+      <aside class="side-pile" aria-label="Previous trick">
+        <span class="side-pile__label">Last trick · {{ game().seats[trick.winner]?.name }}</span>
+        <div class="side-pile__cards">
+          @for (play of trick.plays; track play.seat) {
+            @if (play.card === null) {
+              <!-- An under this seat was never entitled to see stays face down afterwards. -->
+              <span class="pile-card pile-card--facedown" aria-label="Face-down card">?</span>
+            } @else {
+              <span
+                class="pile-card pile-card--art"
+                [class.pile-card--winner]="play.seat === trick.winner"
+                [style.background-position]="spritePosition(play.card)"
+                [attr.aria-label]="cardLabel(play.card)"
+              ></span>
+            }
+          }
+        </div>
+      </aside>
+    } @else if (buryPreview().length) {
+      <aside class="side-pile" aria-label="The cards you buried">
+        <span class="side-pile__label">Your bury</span>
+        <div class="side-pile__cards">
+          @for (card of buryPreview(); track card) {
+            <span
+              class="pile-card pile-card--art"
+              [style.background-position]="spritePosition(card)"
+              [attr.aria-label]="cardLabel(card)"
+            ></span>
+          }
+        </div>
+      </aside>
+    }
   </div>
 
 </section>

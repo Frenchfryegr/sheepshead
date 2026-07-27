@@ -275,7 +275,8 @@
 /* The sheet is pip art on transparency — it contains no card body, so .play-card's own cream
    rectangle *is* the card and this only paints the markings onto it. Percentage sizing means the
    sheet's resolution is irrelevant; a larger sheet drops in with no other change. */
-.play-card--art {
+.play-card--art,
+.pile-card--art {
   background-image: url('/cards/faces.png');
   background-repeat: no-repeat;
   background-size: 1300% 400%;   /* 13 columns x 4 rows */
@@ -289,7 +290,8 @@
    nearest-neighbour is what keeps hard-edged art crisp rather than blurred.
    crisp-edges first for browsers that only understand that spelling. */
 @media (min-resolution: 1.5dppx) {
-  .play-card--art {
+  .play-card--art,
+  .pile-card--art {
     image-rendering: crisp-edges;
     image-rendering: pixelated;
   }
@@ -414,6 +416,86 @@
 .play-card--dim {
   filter: saturate(.45);
   opacity: .45;
+}
+
+/* The last trick, parked in the bottom-right corner. Every seat sees it — a finished trick lies
+   face up on a real table — and it is replaced the instant the next one closes, so it is a
+   reminder rather than a log. Before the first trick of a hand it carries the blind instead,
+   which the backend sends to the picker alone.
+
+   Sized off --card-w so it scales with everything else, and pointer-events: none because it is
+   pure information sitting near the hand fan. */
+.side-pile {
+  --pile-w: calc(var(--card-w) * .46);
+  --pile-h: calc(var(--card-h) * .46);
+  --pile-overlap: calc(var(--pile-w) * .58);
+
+  position: absolute;
+  z-index: 5;
+  right: max(.75rem, env(safe-area-inset-right));
+  bottom: max(calc(var(--card-h) + 34px), calc(env(safe-area-inset-bottom) + var(--card-h) + 24px));
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  align-items: flex-end;
+  /* Explicit, like .table-prompt. Left to shrink-to-fit, an absolutely positioned box sized
+     around flex items carrying negative margins does not reliably land on the row's real
+     width, and the overflow runs off the right-hand edge of the screen. */
+  width: max-content;
+  padding: .4rem .55rem .55rem;
+  border-radius: .6rem;
+  background: rgb(0 0 0 / 24%);
+  pointer-events: none;
+}
+
+.side-pile__label {
+  color: rgb(255 255 255 / 72%);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+/* The overlap goes between cards only — see .pile-card + .pile-card — so the first card starts
+   at the box's own edge and the row is exactly as wide as it looks. */
+.side-pile__cards {
+  display: flex;
+  width: max-content;
+}
+
+.pile-card {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--pile-w);
+  height: var(--pile-h);
+  border: 1px solid #d7d1c5;
+  border-radius: calc(var(--pile-w) * .078);
+  color: rgb(255 255 255 / 72%);
+  /* background-color, not the `background` shorthand: this rule sits below .pile-card--art in
+     the file and at equal specificity, so the shorthand would reset the sprite to none. */
+  background-color: #fffdf8;
+  box-shadow: -2px 2px 6px rgb(0 0 0 / 30%);
+}
+
+.pile-card + .pile-card {
+  margin-left: calc(-1 * var(--pile-overlap));
+}
+
+.pile-card--facedown {
+  border-color: #e9ddc5;
+  background: repeating-linear-gradient(45deg, #173d65, #173d65 4px, #2b5e8c 4px, #2b5e8c 8px);
+  font-size: calc(var(--pile-w) * .3);
+  font-weight: 900;
+}
+
+/* No z-index. It applies to flex items even when they are statically positioned, so lifting the
+   winner here put it above every card played after it and broke the left-to-right stack. The
+   outline reads fine on the 42% of each card the next one leaves exposed. */
+.pile-card--winner {
+  outline: 2px solid rgb(242 211 111 / 90%);
+  outline-offset: -2px;
 }
 
 /* Floating centre panel, mirroring the tracked Table View round-result hub. */

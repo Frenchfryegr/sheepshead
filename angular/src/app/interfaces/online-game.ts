@@ -83,6 +83,8 @@ export interface OnlineGameView {
   hand_number: number
   dealer_seat: number
   hand: OnlineCard[]
+  /** The picker's own bury. Empty for every other seat, and before anyone has buried. */
+  buried: OnlineCard[]
   phase: OnlinePhase
   turn_seat: number | null
   passes: number[]

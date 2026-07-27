@@ -101,6 +101,29 @@ export class PlayTable {
     return !played
   })
 
+  /**
+   * The trick that just finished, parked bottom-right until the next one closes over it. Public
+   * to every seat, not only the winner — a completed trick lies face up on a real table, and
+   * `completed_tricks` is already what the AI counts cards from.
+   *
+   * Only ever the *latest*: the slot is a reminder of the trick just gone, not a hand log, and
+   * the history dialog is where a full account belongs. Playback moves the trick here as it
+   * sweeps, so it appears exactly when the cards leave the middle of the table.
+   */
+  previousTrick = computed(() => {
+    const tricks = this.game().completed_tricks
+    return tricks.length ? tricks[tricks.length - 1] : null
+  })
+
+  /**
+   * The picker's bury occupies the same slot from the moment they commit to it until the first
+   * trick lands on top of it. `buried` is populated for the picker alone and is an empty list
+   * for everyone else, so no other seat can render it — not even a card back.
+   */
+  buryPreview = computed<OnlineCard[]>(() =>
+    this.previousTrick() ? [] : this.game().buried,
+  )
+
   holdsUnder(seat: number): boolean {
     return this.underPending() && this.game().picker_seat === seat
   }

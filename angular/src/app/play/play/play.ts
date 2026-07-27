@@ -317,6 +317,11 @@ export class Play implements OnInit, OnDestroy {
         const displayed = this.activeGame()
         if (displayed) {
           const swept = this.cloneView(displayed)
+          // The trick does not vanish, it moves: sweeping it into the history is what puts it
+          // in the previous-trick slot at the moment it leaves the middle of the table.
+          if (event.seat !== undefined && swept.current_trick.length > 0) {
+            swept.completed_tricks.push({ winner: event.seat, plays: swept.current_trick })
+          }
           swept.current_trick = []
           swept.trick_winning_seat = null
           this.activeGame.set(swept)
@@ -399,6 +404,15 @@ export class Play implements OnInit, OnDestroy {
         next.picker_seat = event.seat
         next.turn_seat = event.seat
         break
+      case 'buried':
+        // The cards are not in the event — the bury is redacted per seat — so take them from
+        // the response, which carries them only when this player is the one who buried.
+        next.buried = response.buried
+        break
+      case 'unburied':
+        // Taken back to be chosen again, so there is nothing to show until they re-commit.
+        next.buried = []
+        break
       case 'called':
         next.called_card = event.card ?? null
         // The event deliberately omits the under card itself, so take the public flag from the
@@ -463,6 +477,9 @@ export class Play implements OnInit, OnDestroy {
     view.current_trick = []
     view.trick_winning_seat = null
     view.completed_tricks = []
+    // Nobody has buried yet — clearing this matters most on the `new_hand` rewind, where the
+    // response may already carry the next hand's bury.
+    view.buried = []
     view.turn_seat = (view.dealer_seat + 1) % view.ruleset.num_players
     for (const seat of view.seats) {
       seat.card_count = view.ruleset.cards_per_player
