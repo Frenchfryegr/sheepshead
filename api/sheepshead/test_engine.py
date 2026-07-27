@@ -459,6 +459,25 @@ class EngineTests(unittest.TestCase):
         for seat in range(5):
             self._assert_no_leak(state, seat)
 
+    def test_bury_is_visible_to_the_picker_alone(self) -> None:
+        """The table's bottom-right pile shows the picker their bury, so the field it reads
+        from has to carry the cards for that seat and nothing at all for the others."""
+        state = create_game(RuleSet(), _seats(), 789)
+        picker = state.hand.turn_seat
+        pick = next(action for action in legal_actions(state, picker) if action.type == "pick")
+        state, _ = apply_action(state, picker, pick)
+        bury = next(action for action in legal_actions(state, picker) if action.type == "bury")
+        state, _ = apply_action(state, picker, bury)
+
+        buried = [str(card) for card in bury.cards]
+        self.assertEqual(sorted(buried), sorted(seat_view(state, picker)["buried"]))
+        for seat in range(5):
+            if seat == picker:
+                continue
+            # Not even a count: an empty list gives the other seats nothing to render at all.
+            self.assertEqual([], seat_view(state, seat)["buried"])
+            self._assert_no_leak(state, seat)
+
 
 if __name__ == "__main__":
     unittest.main()
